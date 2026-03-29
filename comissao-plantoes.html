@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a5c3a">
+<title>COOPANEST-PE — Comissão de Plantões</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde:        #0a5c3a;
+  --verde-mid:    #0d7a4e;
+  --verde-dark:   #073d28;
+  --verde-light:  #e8f5ef;
+  --verde-pale:   #f2faf6;
+  --branco:       #ffffff;
+  --cinza-0:      #f4f6f5;
+  --cinza-1:      #ebeeed;
+  --cinza-2:      #d6dbd8;
+  --cinza-3:      #a8b3ae;
+  --cinza-4:      #6b7570;
+  --texto:        #1a2420;
+  --alerta:       #c8530a;
+  --alerta-bg:    #fff4ee;
+  --alerta-borda: #f0a060;
+  --erro:         #b91c1c;
+  --erro-bg:      #fef2f2;
+  --info:         #1d5fa5;
+  --info-bg:      #eaf1fb;
+  --amarelo:      #854f0b;
+  --amarelo-bg:   #fefbea;
+  --r:            10px;
+  --r-lg:         16px;
+  --r-xl:         20px;
+  --sombra:       0 2px 16px rgba(10,92,58,.07);
+  --sombra-md:    0 4px 24px rgba(10,92,58,.11);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cinza-0);
+  color: var(--texto);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--verde-dark);
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 20px rgba(0,0,0,.22);
+}
+.header-inner {
+  max-width: 900px; margin: 0 auto;
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,.12); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-logo svg { width: 22px; height: 22px; fill: white; }
+.header-title h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; color: white; font-weight: 400; line-height: 1.2;
+}
+.header-title p { font-size: 11px; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── TABS ── */
+.tabs-bar {
+  background: var(--verde-dark);
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.tabs-inner {
+  max-width: 900px; margin: 0 auto;
+  display: flex; gap: 0;
+}
+.tab {
+  padding: 11px 20px; font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,.55); cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color .15s, border-color .15s;
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+}
+.tab:hover { color: rgba(255,255,255,.85); }
+.tab.ativa { color: white; border-bottom-color: #4ade80; }
+.tab .badge-tab {
+  background: var(--alerta); color: white;
+  border-radius: 20px; padding: 1px 7px;
+  font-size: 11px; font-weight: 700;
+  display: none;
+}
+.tab .badge-tab.vis { display: inline-block; }
+
+/* ── WRAPPER ── */
+.wrapper { max-width: 900px; margin: 0 auto; padding: 22px 16px 70px; }
+
+/* ── TELA ── */
+.tela { display: none; }
+.tela.vis { display: block; animation: fadeUp .3s ease both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── STATS BAR ── */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 600px) { .stats-bar { grid-template-columns: repeat(2,1fr); } }
+.stat-card {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); padding: 14px 16px;
+}
+.stat-card .sc-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px; line-height: 1;
+}
+.stat-card .sc-label { font-size: 12px; color: var(--cinza-4); margin-top: 2px; }
+.stat-card.urgente .sc-num { color: var(--alerta); }
+.stat-card.normal  .sc-num { color: var(--verde); }
+.stat-card.rep     .sc-num { color: var(--info); }
+.stat-card.disc    .sc-num { color: var(--erro); }
+
+/* ── FILTROS ── */
+.filtros-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  align-items: center;
+}
+.filtro-btn {
+  padding: 6px 14px; border-radius: 20px;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--cinza-2);
+  background: white; color: var(--cinza-4);
+  transition: all .15s;
+}
+.filtro-btn:hover { border-color: var(--verde); color: var(--verde); }
+.filtro-btn.ativo { background: var(--verde); color: white; border-color: var(--verde); }
+.busca-input {
+  flex: 1; min-width: 180px; padding: 7px 13px;
+  border: 1.5px solid var(--cinza-1); border-radius: 20px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--texto);
+  background: white;
+}
+.busca-input:focus { outline: none; border-color: var(--verde-mid); }
+
+/* ── CARD DE ACIONAMENTO ── */
+.acion-card {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); margin-bottom: 10px;
+  overflow: hidden; border-left: 4px solid transparent;
+  animation: fadeUp .25s ease both;
+}
+.acion-card.pendente-atestado { border-left-color: var(--alerta); }
+.acion-card.pendente-rep      { border-left-color: var(--info); }
+.acion-card.disciplinar       { border-left-color: var(--erro); }
+.acion-card.ok                { border-left-color: var(--verde); }
+.acion-card.vencido           { border-left-color: var(--erro); background: #fffafa; }
+
+.acion-header {
+  padding: 12px 16px;
+  display: flex; align-items: flex-start; gap: 10px;
+  border-bottom: 1px solid var(--cinza-1);
+}
+.acion-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+  font-family: 'DM Serif Display', serif;
+}
+.acion-info { flex: 1; min-width: 0; }
+.acion-nome { font-size: 14px; font-weight: 600; }
+.acion-sub  { font-size: 12px; color: var(--cinza-4); }
+.acion-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.tag {
+  font-size: 11px; font-weight: 600; padding: 2px 9px;
+  border-radius: 20px; white-space: nowrap;
+}
+.tag.am      { background: var(--amarelo-bg); color: var(--amarelo); }
+.tag.disc    { background: var(--erro-bg);    color: var(--erro); }
+.tag.rep     { background: var(--info-bg);    color: var(--info); }
+.tag.ok-tag  { background: var(--verde-light);color: var(--verde); }
+.tag.venc    { background: var(--erro-bg);    color: var(--erro); }
+.tag.pend    { background: var(--alerta-bg);  color: var(--alerta); }
+.tag.outros  { background: var(--cinza-1);    color: var(--cinza-4); }
+
+.acion-body {
+  padding: 12px 16px;
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+}
+@media (max-width: 560px) { .acion-body { grid-template-columns: 1fr 1fr; } }
+.dc { font-size: 13px; }
+.dc .dl { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--cinza-4); margin-bottom: 1px; }
+.dc .dv { font-weight: 500; color: var(--texto); }
+
+/* Prazo urgente */
+.prazo-urgente {
+  background: var(--alerta-bg);
+  border-top: 1px solid var(--alerta-borda);
+  padding: 8px 16px; font-size: 12px; color: #7c3200;
+  display: flex; align-items: center; gap: 6px;
+}
+
+.acion-acoes {
+  padding: 10px 16px; border-top: 1px solid var(--cinza-1);
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.btn-acao {
+  padding: 7px 16px; border-radius: 8px;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.btn-confirmar-atestado { background: var(--verde-light); color: var(--verde); }
+.btn-confirmar-atestado:hover { background: #c8eedd; }
+.btn-rep-cumprida { background: var(--info-bg); color: var(--info); }
+.btn-rep-cumprida:hover { background: #cfe2f8; }
+.btn-ver-atestado { background: var(--cinza-1); color: var(--texto); }
+.btn-ver-atestado:hover { background: var(--cinza-2); }
+.protocolo-label {
+  margin-left: auto; font-size: 11px; color: var(--cinza-4);
+  font-family: monospace; letter-spacing: .5px;
+}
+
+/* ── HISTÓRICO ── */
+.hist-table-wrap { background: white; border-radius: var(--r-lg); box-shadow: var(--sombra); overflow: hidden; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hist-table th {
+  background: var(--verde-dark); color: white;
+  padding: 10px 14px; text-align: left;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600;
+}
+.hist-table td { padding: 10px 14px; border-bottom: 1px solid var(--cinza-1); vertical-align: middle; }
+.hist-table tr:last-child td { border-bottom: none; }
+.hist-table tr:hover td { background: var(--verde-pale); }
+.hist-table .status-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.overflow-x { overflow-x: auto; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 500;
+  align-items: flex-end; animation: fadeIn .2s ease;
+}
+.modal-overlay.vis { display: flex; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal {
+  background: white; width: 100%; max-width: 900px;
+  margin: 0 auto; border-radius: var(--r-xl) var(--r-xl) 0 0;
+  max-height: 88vh; overflow-y: auto;
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-header {
+  background: var(--verde-dark); padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.modal-header h3 { font-family: 'DM Serif Display', serif; font-size: 17px; color: white; font-weight: 400; }
+.btn-fechar {
+  background: rgba(255,255,255,.12); border: none; border-radius: 8px;
+  color: white; width: 32px; height: 32px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.btn-fechar:hover { background: rgba(255,255,255,.22); }
+.modal-body { padding: 20px; }
+
+.detalhe-secao { margin-bottom: 20px; }
+.detalhe-secao h4 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--verde); font-weight: 700; margin-bottom: 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--cinza-1);
+}
+.detalhe-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+@media (max-width:480px) { .detalhe-grid { grid-template-columns: 1fr; } }
+.dl-item .dli-label { font-size: 11px; color: var(--cinza-4); margin-bottom: 2px; }
+.dl-item .dli-valor { font-size: 14px; font-weight: 500; }
+
+/* Ações do modal */
+.modal-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.btn-modal-acao {
+  flex: 1; min-width: 140px; padding: 12px;
+  border-radius: var(--r); font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+  transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn-ma-atestado  { background: var(--verde-light); color: var(--verde); }
+.btn-ma-atestado:hover  { background: #c8eedd; }
+.btn-ma-rep       { background: var(--info-bg);    color: var(--info); }
+.btn-ma-rep:hover { background: #cfe2f8; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--verde-dark); color: white;
+  padding: 12px 22px; border-radius: 30px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+  z-index: 900; transition: transform .3s ease;
+  white-space: nowrap;
+}
+.toast.vis { transform: translateX(-50%) translateY(0); }
+
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--cinza-4); font-size: 14px;
+}
+.empty-state .em-icon { font-size: 36px; margin-bottom: 10px; }
+.empty-state strong { display: block; color: var(--texto); font-size: 15px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-logo" style="background:transparent; padding:0; width:52px; height:36px; display:flex; align-items:center; justify-content:center; background-color:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+      <svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Padrão de pontos da marca COOPANEST -->
+  <!-- Coluna 1 (esquerda, baixo) -->
+  <circle cx="6" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="6" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="6" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <!-- Coluna 2 -->
+  <circle cx="16" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="16" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="16" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="16" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 3 -->
+  <circle cx="26" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="26" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="26" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="26" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 4 (direita, menor) -->
+  <circle cx="35" cy="32" r="3"   fill="white" opacity=".9"/>
+  <circle cx="35" cy="22" r="2.5" fill="white" opacity=".7"/>
+  <circle cx="35" cy="13" r="1.8" fill="white" opacity=".45"/>
+</svg>
+    </div>
+      <div class="header-title">
+        <h1>COOPANEST-PE</h1>
+        <p>Comissão de Plantões</p>
+      </div>
+    </div>
+    <div style="font-size:12px;color:rgba(255,255,255,.5);" id="ultima-atualizacao">—</div>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <div class="tabs-inner">
+    <div class="tab ativa" id="tab-pendencias" onclick="mudarTab('pendencias')">
+      Pendências
+      <span class="badge-tab" id="badge-pendencias">0</span>
+    </div>
+    <div class="tab" id="tab-historico" onclick="mudarTab('historico')">
+      Histórico completo
+    </div>
+  </div>
+</div>
+
+<!-- ════ TELA: PENDÊNCIAS ════ -->
+<div id="tela-pendencias" class="tela vis wrapper">
+
+  <div class="stats-bar">
+    <div class="stat-card urgente">
+      <div class="sc-num" id="st-atestado">0</div>
+      <div class="sc-label">Atestados pendentes</div>
+    </div>
+    <div class="stat-card rep">
+      <div class="sc-num" id="st-reposicao">0</div>
+      <div class="sc-label">Reposições pendentes</div>
+    </div>
+    <div class="stat-card disc">
+      <div class="sc-num" id="st-disciplinar">0</div>
+      <div class="sc-label">Afastamentos disciplinares</div>
+    </div>
+    <div class="stat-card normal">
+      <div class="sc-num" id="st-vencido">0</div>
+      <div class="sc-label">Prazos vencidos</div>
+    </div>
+  </div>
+
+  <div class="filtros-bar">
+    <button class="filtro-btn ativo" onclick="setFiltro('todos', this)">Todos</button>
+    <button class="filtro-btn" onclick="setFiltro('atestado', this)">Atestado</button>
+    <button class="filtro-btn" onclick="setFiltro('reposicao', this)">Reposição</button>
+    <button class="filtro-btn" onclick="setFiltro('disciplinar', this)">Disciplinar</button>
+    <button class="filtro-btn" onclick="setFiltro('vencido', this)">Vencido</button>
+    <input class="busca-input" id="busca-pendencias" placeholder="Buscar plantonista…" oninput="renderPendencias()">
+  </div>
+
+  <div id="lista-pendencias"></div>
+</div>
+
+<!-- ════ TELA: HISTÓRICO ════ -->
+<div id="tela-historico" class="tela wrapper">
+
+  <div class="filtros-bar">
+    <button class="filtro-btn ativo" onclick="setFiltroHist('todos', this)">Todos</button>
+    <button class="filtro-btn" onclick="setFiltroHist('am', this)">Atestado médico</button>
+    <button class="filtro-btn" onclick="setFiltroHist('rep', this)">Com reposição</button>
+    <button class="filtro-btn" onclick="setFiltroHist('disc', this)">Disciplinar</button>
+    <input class="busca-input" id="busca-hist" placeholder="Buscar plantonista ou protocolo…" oninput="renderHistorico()">
+  </div>
+
+  <div class="overflow-x">
+    <div class="hist-table-wrap">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>Protocolo</th>
+            <th>Plantonista</th>
+            <th>Data plantão</th>
+            <th>Motivo</th>
+            <th>Atestado</th>
+            <th>Reposição</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MODAL DETALHE ════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="fecharModalFora(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-titulo">Detalhes do acionamento</h3>
+      <button class="btn-fechar" onclick="fecharModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
+
+// ── Dados simulados (substituídos pelo Apps Script em produção)
+let acionamentos = [
+  {
+    protocolo: "AC-20260320-083021", nome: "Rodrigo Salzano",
+    hospital: "Hospital da Restauração — Urgência (HR)",
+    dataPlantao: "20/03/2026", turno: "Diurno (07h–19h)",
+    motivo: "Doença/Atestado Médico", duracao: "< 72h",
+    statusAtestado: "Pendente", prazo48h: new Date(Date.now() + 6*3600*1000).toISOString(),
+    exigeRep: true, dataRep: "25/03/2026", turnoRep: "Noturno (19h–07h)", statusRep: "Pendente",
+    obs: ""
+  },
+  {
+    protocolo: "AC-20260319-194512", nome: "Ana Clara",
+    hospital: "Hospital Miguel Arraes (HMA)",
+    dataPlantao: "19/03/2026", turno: "Noturno (19h–07h)",
+    motivo: "Doença/Atestado Médico", duracao: "≥ 72h",
+    statusAtestado: "Pendente", prazo48h: new Date(Date.now() - 2*3600*1000).toISOString(),
+    exigeRep: false, dataRep: "", turnoRep: "", statusRep: "N/A",
+    obs: ""
+  },
+  {
+    protocolo: "AC-20260318-071103", nome: "Brunna Caroline",
+    hospital: "Hospital Barão de Lucena (HBL)",
+    dataPlantao: "18/03/2026", turno: "Diurno (07h–19h)",
+    motivo: "Afastamento disciplinar", duracao: "N/A",
+    statusAtestado: "N/A", prazo48h: "",
+    exigeRep: false, dataRep: "", turnoRep: "", statusRep: "N/A",
+    obs: "Encaminhado ao Comitê"
+  },
+  {
+    protocolo: "AC-20260315-142233", nome: "Marcelo Banja",
+    hospital: "Maternidade CISAM",
+    dataPlantao: "15/03/2026", turno: "Diurno (07h–19h)",
+    motivo: "Doença/Atestado Médico", duracao: "< 72h",
+    statusAtestado: "Recebido", prazo48h: "",
+    exigeRep: true, dataRep: "22/03/2026", turnoRep: "Diurno (07h–19h)", statusRep: "Pendente",
+    obs: ""
+  },
+  {
+    protocolo: "AC-20260310-091800", nome: "Larissa Tavares",
+    hospital: "IMIP Maternidade",
+    dataPlantao: "10/03/2026", turno: "Diurno (07h–19h)",
+    motivo: "Licença-maternidade", duracao: "N/A",
+    statusAtestado: "N/A", prazo48h: "",
+    exigeRep: false, dataRep: "", turnoRep: "", statusRep: "N/A",
+    obs: ""
+  },
+  {
+    protocolo: "AC-20260308-200455", nome: "Rafael Maroja",
+    hospital: "Hospital Pelópidas da Silveira (HPS)",
+    dataPlantao: "08/03/2026", turno: "Noturno (19h–07h)",
+    motivo: "Doença/Atestado Médico", duracao: "< 72h",
+    statusAtestado: "Recebido", prazo48h: "",
+    exigeRep: true, dataRep: "20/03/2026", turnoRep: "Noturno (19h–07h)", statusRep: "Cumprida",
+    obs: ""
+  }
+];
+
+let filtroAtivo     = "todos";
+let filtroHistAtivo = "todos";
+let acionamentoAtual = null;
+
+// ── Inicialização
+document.addEventListener("DOMContentLoaded", () => {
+  carregarDados();
+  document.getElementById("ultima-atualizacao").textContent = "Atualizado em " + horaAtual();
+});
+
+async function carregarDados() {
+  if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+    try {
+      const url  = APPS_SCRIPT_URL + "?action=listarAcionamentos";
+      const resp = await fetch(url);
+      const json = await resp.json();
+      if (json.ok) acionamentos = json.dados;
+    } catch(e) { console.warn("Usando dados demo:", e); }
+  }
+  renderTudo();
+}
+
+function renderTudo() {
+  renderStats();
+  renderPendencias();
+  renderHistorico();
+  atualizarBadge();
+}
+
+// ── Stats
+function renderStats() {
+  const atestPend  = acionamentos.filter(isPendAtestado).length;
+  const repPend    = acionamentos.filter(a => a.exigeRep && a.statusRep === "Pendente").length;
+  const disc       = acionamentos.filter(a => a.motivo === "Afastamento disciplinar").length;
+  const vencidos   = acionamentos.filter(isVencido).length;
+
+  document.getElementById("st-atestado").textContent   = atestPend;
+  document.getElementById("st-reposicao").textContent  = repPend;
+  document.getElementById("st-disciplinar").textContent= disc;
+  document.getElementById("st-vencido").textContent    = vencidos;
+}
+
+// ── Pendências
+function renderPendencias() {
+  const busca = document.getElementById("busca-pendencias").value.toLowerCase();
+  const lista = document.getElementById("lista-pendencias");
+
+  // Filtra só os que têm pendência
+  let itens = acionamentos.filter(a => {
+    const temPend = isPendAtestado(a) || (a.exigeRep && a.statusRep === "Pendente") ||
+                   a.motivo === "Afastamento disciplinar" || isVencido(a);
+    return temPend;
+  });
+
+  if (filtroAtivo !== "todos") {
+    itens = itens.filter(a => {
+      if (filtroAtivo === "atestado")    return isPendAtestado(a);
+      if (filtroAtivo === "reposicao")   return a.exigeRep && a.statusRep === "Pendente";
+      if (filtroAtivo === "disciplinar") return a.motivo === "Afastamento disciplinar";
+      if (filtroAtivo === "vencido")     return isVencido(a);
+      return true;
+    });
+  }
+
+  if (busca) itens = itens.filter(a => a.nome.toLowerCase().includes(busca) || a.protocolo.toLowerCase().includes(busca));
+
+  if (itens.length === 0) {
+    lista.innerHTML = `<div class="empty-state"><div class="em-icon">✅</div><strong>Nenhuma pendência</strong>Todas as situações estão regularizadas.</div>`;
+    return;
+  }
+
+  lista.innerHTML = itens.map(a => cardAcionamento(a)).join("");
+}
+
+// ── Histórico
+function renderHistorico() {
+  const busca = document.getElementById("busca-hist").value.toLowerCase();
+  let itens = [...acionamentos];
+
+  if (filtroHistAtivo !== "todos") {
+    itens = itens.filter(a => {
+      if (filtroHistAtivo === "am")   return a.motivo === "Doença/Atestado Médico";
+      if (filtroHistAtivo === "rep")  return a.exigeRep;
+      if (filtroHistAtivo === "disc") return a.motivo === "Afastamento disciplinar";
+      return true;
+    });
+  }
+  if (busca) itens = itens.filter(a =>
+    a.nome.toLowerCase().includes(busca) || a.protocolo.toLowerCase().includes(busca)
+  );
+
+  const tbody = document.getElementById("hist-tbody");
+  if (itens.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--cinza-4);padding:30px;">Nenhum registro encontrado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = itens.map(a => {
+    const stAt  = statusPill(a.statusAtestado || "N/A");
+    const stRep = a.exigeRep ? statusPill(a.statusRep) : `<span class="status-pill" style="background:var(--cinza-1);color:var(--cinza-4);">N/A</span>`;
+    return `<tr>
+      <td style="font-size:11px;color:var(--cinza-4);font-family:monospace;">${a.protocolo}</td>
+      <td><strong>${a.nome}</strong></td>
+      <td>${a.dataPlantao}</td>
+      <td style="font-size:12px;">${a.motivo}</td>
+      <td>${stAt}</td>
+      <td>${stRep}</td>
+      <td>
+        <button class="btn-acao btn-ver-atestado" onclick="abrirDetalhe('${a.protocolo}')" style="font-size:11px;padding:5px 10px;">Ver detalhes</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ── Card de acionamento (pendências)
+function cardAcionamento(a) {
+  const inicial  = a.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase();
+  const corCard  = isVencido(a) ? "vencido" : a.motivo === "Afastamento disciplinar" ? "disciplinar" :
+                   isPendAtestado(a) ? "pendente-atestado" :
+                   (a.exigeRep && a.statusRep === "Pendente") ? "pendente-rep" : "ok";
+  const corAv    = corCard === "pendente-atestado" ? "background:#fff3e0;color:#c8530a"
+                 : corCard === "disciplinar"        ? "background:#fef2f2;color:#b91c1c"
+                 : corCard === "vencido"            ? "background:#fef2f2;color:#b91c1c"
+                 : "background:var(--verde-light);color:var(--verde)";
+
+  const tags = [];
+  if (a.motivo === "Doença/Atestado Médico")  tags.push(`<span class="tag am">Atestado médico</span>`);
+  if (a.motivo === "Afastamento disciplinar") tags.push(`<span class="tag disc">Disciplinar</span>`);
+  if (isPendAtestado(a) && !isVencido(a))     tags.push(`<span class="tag pend">Atestado pendente</span>`);
+  if (isVencido(a))                           tags.push(`<span class="tag venc">Prazo vencido</span>`);
+  if (a.exigeRep && a.statusRep==="Pendente") tags.push(`<span class="tag rep">Reposição pendente</span>`);
+  if (a.exigeRep && a.statusRep==="Cumprida") tags.push(`<span class="tag ok-tag">Reposição cumprida</span>`);
+
+  // Prazo restante
+  let prazoHtml = "";
+  if (isPendAtestado(a) && a.prazo48h) {
+    const horasRest = (new Date(a.prazo48h) - new Date()) / 3600000;
+    if (horasRest > 0) {
+      prazoHtml = `<div class="prazo-urgente">⏱ ${Math.round(horasRest)}h restantes para recebimento do atestado</div>`;
+    }
+  }
+
+  // Botões de ação
+  const botoesAtestado = a.statusAtestado === "Pendente" || a.statusAtestado === "Vencido — escalado"
+    ? `<button class="btn-acao btn-confirmar-atestado" onclick="confirmarAtestado('${a.protocolo}')">✓ Confirmar atestado recebido</button>`
+    : "";
+  const botoesRep = a.exigeRep && a.statusRep === "Pendente"
+    ? `<button class="btn-acao btn-rep-cumprida" onclick="confirmarReposicao('${a.protocolo}')">✓ Marcar reposição cumprida</button>`
+    : "";
+
+  return `
+  <div class="acion-card ${corCard}" id="card-${a.protocolo.replace(/-/g,'_')}">
+    <div class="acion-header">
+      <div class="acion-avatar" style="${corAv}">${inicial}</div>
+      <div class="acion-info">
+        <div class="acion-nome">${a.nome}</div>
+        <div class="acion-sub">${a.hospital} · ${a.dataPlantao} · ${a.turno}</div>
+        <div class="acion-tags">${tags.join("")}</div>
+      </div>
+    </div>
+    ${prazoHtml}
+    <div class="acion-body">
+      <div class="dc"><div class="dl">Motivo</div><div class="dv">${a.motivo}</div></div>
+      <div class="dc"><div class="dl">Atestado</div><div class="dv">${a.statusAtestado || "N/A"}</div></div>
+      ${a.exigeRep ? `
+      <div class="dc"><div class="dl">Reposição</div><div class="dv">${a.statusRep}</div></div>
+      <div class="dc"><div class="dl">Data reposição</div><div class="dv">${a.dataRep || "—"} ${a.turnoRep ? "· " + a.turnoRep.split(" ")[0] : ""}</div></div>
+      ` : ""}
+      ${a.obs ? `<div class="dc" style="grid-column:1/-1"><div class="dl">Obs</div><div class="dv">${a.obs}</div></div>` : ""}
+    </div>
+    <div class="acion-acoes">
+      ${botoesAtestado}
+      ${botoesRep}
+      <button class="btn-acao btn-ver-atestado" onclick="abrirDetalhe('${a.protocolo}')">Ver detalhes</button>
+      <span class="protocolo-label">${a.protocolo}</span>
+    </div>
+  </div>`;
+}
+
+// ── Modal detalhe
+function abrirDetalhe(protocolo) {
+  const a = acionamentos.find(x => x.protocolo === protocolo);
+  if (!a) return;
+  acionamentoAtual = a;
+
+  document.getElementById("modal-titulo").textContent = a.nome + " · " + a.protocolo;
+
+  const botoesModal = [];
+  if (a.statusAtestado === "Pendente" || a.statusAtestado === "Vencido — escalado") {
+    botoesModal.push(`<button class="btn-modal-acao btn-ma-atestado" onclick="confirmarAtestado('${a.protocolo}');fecharModal()">✓ Confirmar atestado recebido</button>`);
+  }
+  if (a.exigeRep && a.statusRep === "Pendente") {
+    botoesModal.push(`<button class="btn-modal-acao btn-ma-rep" onclick="confirmarReposicao('${a.protocolo}');fecharModal()">✓ Marcar reposição cumprida</button>`);
+  }
+
+  document.getElementById("modal-body").innerHTML = `
+    <div class="detalhe-secao">
+      <h4>Plantonista e plantão</h4>
+      <div class="detalhe-grid">
+        <div class="dl-item"><div class="dli-label">Nome</div><div class="dli-valor">${a.nome}</div></div>
+        <div class="dl-item"><div class="dli-label">Hospital</div><div class="dli-valor">${a.hospital}</div></div>
+        <div class="dl-item"><div class="dli-label">Data do plantão</div><div class="dli-valor">${a.dataPlantao}</div></div>
+        <div class="dl-item"><div class="dli-label">Turno</div><div class="dli-valor">${a.turno}</div></div>
+      </div>
+    </div>
+    <div class="detalhe-secao">
+      <h4>Motivo do afastamento</h4>
+      <div class="detalhe-grid">
+        <div class="dl-item"><div class="dli-label">Motivo</div><div class="dli-valor">${a.motivo}</div></div>
+        ${a.duracao !== "N/A" ? `<div class="dl-item"><div class="dli-label">Duração atestado</div><div class="dli-valor">${a.duracao}</div></div>` : ""}
+      </div>
+    </div>
+    <div class="detalhe-secao">
+      <h4>Documentação</h4>
+      <div class="detalhe-grid">
+        <div class="dl-item"><div class="dli-label">Status atestado</div><div class="dli-valor">${statusPill(a.statusAtestado || "N/A")}</div></div>
+        ${a.exigeRep ? `
+        <div class="dl-item"><div class="dli-label">Reposição</div><div class="dli-valor">${statusPill(a.statusRep)}</div></div>
+        <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep || "—"}</div></div>
+        <div class="dl-item"><div class="dli-label">Turno reposição</div><div class="dli-valor">${a.turnoRep || "—"}</div></div>
+        ` : ""}
+      </div>
+    </div>
+    ${botoesModal.length > 0 ? `<div class="modal-acoes">${botoesModal.join("")}</div>` : ""}
+  `;
+
+  document.getElementById("modal-overlay").classList.add("vis");
+  document.body.style.overflow = "hidden";
+}
+
+function fecharModal() {
+  document.getElementById("modal-overlay").classList.remove("vis");
+  document.body.style.overflow = "";
+}
+function fecharModalFora(e) {
+  if (e.target === document.getElementById("modal-overlay")) fecharModal();
+}
+
+// ── Ações
+async function confirmarAtestado(protocolo) {
+  const a = acionamentos.find(x => x.protocolo === protocolo);
+  if (!a) return;
+  a.statusAtestado = "Recebido";
+  a.prazo48h       = "";
+  await enviarAcao({ action: "confirmarAtestado", protocolo });
+  renderTudo();
+  mostrarToast("✓ Atestado confirmado para " + a.nome);
+}
+
+async function confirmarReposicao(protocolo) {
+  const a = acionamentos.find(x => x.protocolo === protocolo);
+  if (!a) return;
+  a.statusRep = "Cumprida";
+  await enviarAcao({ action: "confirmarReposicao", protocolo });
+  renderTudo();
+  mostrarToast("✓ Reposição marcada como cumprida para " + a.nome);
+}
+
+async function enviarAcao(payload) {
+  if (APPS_SCRIPT_URL === "COLE_AQUI_A_URL_DO_WEB_APP") return;
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST", body: JSON.stringify(payload),
+      headers: {"Content-Type":"application/json"}
+    });
+  } catch(e) { console.warn("Erro ao enviar:", e); }
+}
+
+// ── Filtros
+function setFiltro(f, el) {
+  filtroAtivo = f;
+  document.querySelectorAll("#tela-pendencias .filtro-btn").forEach(b => b.classList.remove("ativo"));
+  el.classList.add("ativo");
+  renderPendencias();
+}
+function setFiltroHist(f, el) {
+  filtroHistAtivo = f;
+  document.querySelectorAll("#tela-historico .filtro-btn").forEach(b => b.classList.remove("ativo"));
+  el.classList.add("ativo");
+  renderHistorico();
+}
+
+// ── Tabs
+function mudarTab(tab) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("ativa"));
+  document.querySelectorAll(".tela").forEach(t => t.classList.remove("vis"));
+  document.getElementById("tab-" + tab).classList.add("ativa");
+  document.getElementById("tela-" + tab).classList.add("vis");
+}
+
+function atualizarBadge() {
+  const n = acionamentos.filter(a =>
+    isPendAtestado(a) || (a.exigeRep && a.statusRep === "Pendente") ||
+    a.motivo === "Afastamento disciplinar" || isVencido(a)
+  ).length;
+  const badge = document.getElementById("badge-pendencias");
+  badge.textContent = n;
+  badge.classList.toggle("vis", n > 0);
+}
+
+// ── Helpers
+function isPendAtestado(a) {
+  return a.motivo === "Doença/Atestado Médico" &&
+         (a.statusAtestado === "Pendente" || a.statusAtestado === "Vencido — escalado");
+}
+function isVencido(a) {
+  return a.statusAtestado === "Vencido — escalado";
+}
+function statusPill(s) {
+  const map = {
+    "Recebido":             "background:#dcfce7;color:#166534",
+    "Recebido — posterior": "background:#dcfce7;color:#166534",
+    "Pendente":             "background:var(--alerta-bg);color:var(--alerta)",
+    "Vencido — escalado":   "background:var(--erro-bg);color:var(--erro)",
+    "Cumprida":             "background:var(--verde-light);color:var(--verde)",
+    "N/A":                  "background:var(--cinza-1);color:var(--cinza-4)",
+    "Verificar":            "background:var(--amarelo-bg);color:var(--amarelo)",
+  };
+  const style = map[s] || "background:var(--cinza-1);color:var(--cinza-4)";
+  return `<span class="status-pill" style="${style}">${s}</span>`;
+}
+function horaAtual() {
+  const n = new Date(), p = x => String(x).padStart(2,"0");
+  return `${p(n.getDate())}/${p(n.getMonth()+1)} às ${p(n.getHours())}:${p(n.getMinutes())}`;
+}
+function mostrarToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("vis");
+  setTimeout(() => t.classList.remove("vis"), 3000);
+}
+</script>
+</body>
+</html>

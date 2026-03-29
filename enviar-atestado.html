@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a5c3a">
+<title>COOPANEST-PE — Envio de Atestado Médico</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde:       #0a5c3a;
+  --verde-mid:   #0d7a4e;
+  --verde-light: #e8f5ef;
+  --verde-pale:  #f2faf6;
+  --branco:      #ffffff;
+  --cinza-1:     #f7f8f7;
+  --cinza-2:     #e8ebe9;
+  --cinza-3:     #b0b8b3;
+  --cinza-4:     #6b7570;
+  --texto:       #1a2420;
+  --alerta:      #c8530a;
+  --alerta-bg:   #fff4ee;
+  --erro:        #b91c1c;
+  --r:           10px;
+  --r-lg:        16px;
+  --sombra:      0 2px 12px rgba(10,92,58,.08);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cinza-1);
+  color: var(--texto);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--verde);
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 16px rgba(0,0,0,.18);
+}
+.header-inner {
+  max-width: 680px; margin: 0 auto;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.header-logo {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,.15);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-logo svg { width: 20px; height: 20px; fill: white; }
+.header-text h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 15px; color: white; font-weight: 400; line-height: 1.2;
+}
+.header-text p { font-size: 11px; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .4px; }
+
+/* ── WRAPPER ── */
+.wrapper { max-width: 680px; margin: 0 auto; padding: 24px 16px 60px; }
+
+/* ── CARD ── */
+.card {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); overflow: hidden; margin-bottom: 14px;
+}
+.card-header {
+  background: var(--verde-light);
+  border-bottom: 1px solid var(--cinza-2);
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 10px;
+}
+.card-header .num {
+  background: var(--verde); color: white;
+  width: 24px; height: 24px; border-radius: 50%;
+  font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.card-header h2 { font-size: 14px; font-weight: 600; color: var(--verde); }
+.card-body { padding: 18px; }
+
+/* ── CAMPOS ── */
+.campo-grupo { margin-bottom: 16px; }
+.campo-grupo:last-child { margin-bottom: 0; }
+.campo-grupo label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--texto); margin-bottom: 5px;
+}
+.campo-grupo label .req { color: var(--verde-mid); margin-left: 2px; }
+.campo-grupo .hint { font-size: 11.5px; color: var(--cinza-4); margin-bottom: 5px; line-height: 1.4; }
+input[type="text"], input[type="email"] {
+  width: 100%; padding: 10px 13px;
+  border: 1.5px solid var(--cinza-2); border-radius: var(--r);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--texto);
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus { outline: none; border-color: var(--verde-mid); box-shadow: 0 0 0 3px rgba(13,122,78,.1); }
+input.erro { border-color: var(--erro); }
+.msg-erro { font-size: 12px; color: var(--erro); margin-top: 4px; display: none; }
+.msg-erro.vis { display: block; }
+
+/* ── PROTOCOLO INPUT — destaque especial ── */
+.protocolo-wrapper { position: relative; }
+.protocolo-wrapper input {
+  font-family: 'DM Serif Display', serif;
+  font-size: 18px; letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 12px 16px; border-width: 2px;
+  color: var(--verde);
+}
+.protocolo-wrapper input::placeholder { font-family: 'DM Sans', sans-serif; font-size: 14px; letter-spacing: 0; color: var(--cinza-3); }
+.protocolo-status {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+  display: none;
+}
+.protocolo-status.encontrado { display: inline-block; background: var(--verde-light); color: var(--verde); }
+.protocolo-status.nao-encontrado { display: inline-block; background: #fef2f2; color: var(--erro); }
+
+/* ── DADOS DO ACIONAMENTO (preview) ── */
+#preview-acionamento {
+  display: none;
+  background: var(--verde-pale);
+  border: 1.5px solid var(--cinza-2);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+#preview-acionamento.vis { display: block; }
+.preview-linha { display: flex; gap: 8px; margin-bottom: 5px; }
+.preview-linha:last-child { margin-bottom: 0; }
+.preview-label { color: var(--cinza-4); font-size: 12px; min-width: 110px; }
+.preview-valor { color: var(--texto); font-weight: 500; }
+.prazo-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600;
+  margin-top: 8px;
+}
+.prazo-badge.ok { background: var(--verde-light); color: var(--verde); }
+.prazo-badge.urgente { background: var(--alerta-bg); color: var(--alerta); }
+.prazo-badge.vencido { background: #fef2f2; color: var(--erro); }
+
+/* ── UPLOAD ── */
+.upload-zone {
+  border: 2px dashed var(--cinza-2);
+  border-radius: var(--r-lg);
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  background: white;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--verde-mid); background: var(--verde-pale); }
+.upload-zone.tem-arquivo { border-color: var(--verde); border-style: solid; background: var(--verde-pale); }
+.upload-icon { font-size: 32px; margin-bottom: 10px; }
+.upload-titulo { font-size: 14px; font-weight: 600; color: var(--verde); margin-bottom: 4px; }
+.upload-sub { font-size: 12px; color: var(--cinza-4); }
+.upload-sub strong { color: var(--texto); }
+
+.arquivo-info {
+  display: none;
+  margin-top: 10px;
+  background: white;
+  border: 1.5px solid #c8e6c9;
+  border-radius: var(--r);
+  padding: 10px 13px;
+  align-items: center; gap: 10px;
+  font-size: 13px;
+}
+.arquivo-info.vis { display: flex; }
+.arquivo-thumb {
+  width: 40px; height: 40px;
+  border-radius: 6px; background: var(--verde-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.arquivo-nome { flex: 1; color: var(--verde); font-weight: 500; word-break: break-all; }
+.arquivo-tam { font-size: 11px; color: var(--cinza-4); }
+.btn-remover {
+  background: none; border: none; cursor: pointer;
+  color: var(--cinza-4); font-size: 18px; padding: 2px; line-height: 1;
+}
+.btn-remover:hover { color: var(--erro); }
+
+/* Preview imagem */
+#img-preview { display: none; max-width: 100%; max-height: 200px; border-radius: var(--r); margin-top: 8px; object-fit: contain; }
+#img-preview.vis { display: block; }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap {
+  display: none; margin-top: 10px;
+  background: var(--cinza-2); border-radius: 20px; height: 6px; overflow: hidden;
+}
+.progress-wrap.vis { display: block; }
+.progress-bar {
+  height: 100%; background: var(--verde); border-radius: 20px;
+  width: 0%; transition: width .3s;
+}
+
+/* ── BOTÃO ── */
+.btn-enviar {
+  width: 100%; padding: 14px;
+  background: var(--verde); color: white; border: none;
+  border-radius: var(--r-lg);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background .15s, box-shadow .15s;
+  box-shadow: 0 4px 16px rgba(10,92,58,.3);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 6px;
+}
+.btn-enviar:hover { background: var(--verde-mid); }
+.btn-enviar:disabled { background: var(--cinza-3); box-shadow: none; cursor: not-allowed; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: white; border-radius: 50%;
+  animation: spin .7s linear infinite; display: none;
+}
+.btn-enviar.loading .spinner { display: block; }
+.btn-enviar.loading .btn-txt { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TELA DE SUCESSO ── */
+#tela-sucesso {
+  display: none; animation: fadeUp .4s ease both;
+}
+#tela-sucesso.vis { display: block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+.sucesso-hero {
+  background: var(--verde); border-radius: var(--r-lg);
+  padding: 32px 24px; text-align: center; color: white; margin-bottom: 14px;
+}
+.sucesso-check {
+  width: 64px; height: 64px; background: rgba(255,255,255,.15);
+  border-radius: 50%; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sucesso-check svg { width: 32px; height: 32px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.sucesso-hero h2 { font-family: 'DM Serif Display', serif; font-size: 22px; font-weight: 400; margin-bottom: 6px; }
+.sucesso-hero p { font-size: 13px; opacity: .85; }
+
+.sucesso-detalhe {
+  background: white; border-radius: var(--r-lg); box-shadow: var(--sombra);
+  padding: 20px; margin-bottom: 14px; font-size: 13px;
+}
+.sucesso-detalhe .linha { display: flex; gap: 8px; margin-bottom: 7px; }
+.sucesso-detalhe .sl { color: var(--cinza-4); min-width: 130px; font-size: 12px; }
+.sucesso-detalhe .sv { color: var(--texto); font-weight: 500; }
+
+.btn-voltar {
+  width: 100%; padding: 12px; background: var(--cinza-1);
+  color: var(--texto); border: 1.5px solid var(--cinza-2);
+  border-radius: var(--r); font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-voltar:hover { background: var(--cinza-2); }
+
+.info-rodape { text-align: center; font-size: 12px; color: var(--cinza-4); margin-top: 16px; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-logo" style="background:transparent; padding:0; width:52px; height:36px; display:flex; align-items:center; justify-content:center; background-color:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+      <svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Padrão de pontos da marca COOPANEST -->
+  <!-- Coluna 1 (esquerda, baixo) -->
+  <circle cx="6" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="6" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="6" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <!-- Coluna 2 -->
+  <circle cx="16" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="16" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="16" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="16" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 3 -->
+  <circle cx="26" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="26" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="26" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="26" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 4 (direita, menor) -->
+  <circle cx="35" cy="32" r="3"   fill="white" opacity=".9"/>
+  <circle cx="35" cy="22" r="2.5" fill="white" opacity=".7"/>
+  <circle cx="35" cy="13" r="1.8" fill="white" opacity=".45"/>
+</svg>
+    </div>
+    <div class="header-text">
+      <h1>COOPANEST-PE</h1>
+      <p>Envio de atestado médico</p>
+    </div>
+  </div>
+</header>
+
+<!-- ════ TELA 1: FORMULÁRIO ════ -->
+<div id="tela-form" class="wrapper">
+
+  <div style="background:var(--alerta-bg); border-left:3px solid var(--alerta); border-radius:0 var(--r) var(--r) 0; padding:12px 16px; margin-bottom:20px; font-size:13px; color:#7c3200; line-height:1.5;">
+    <strong style="display:block; margin-bottom:2px;">Envio de documentação posterior ao acionamento</strong>
+    Use esta página para enviar o atestado médico que não foi anexado no momento do acionamento.
+    Informe o número do protocolo gerado no comprovante.
+  </div>
+
+  <form id="form-atestado" novalidate>
+
+    <!-- SEÇÃO 1: Protocolo -->
+    <div class="card">
+      <div class="card-header">
+        <div class="num">1</div>
+        <h2>Número do protocolo</h2>
+      </div>
+      <div class="card-body">
+        <div class="campo-grupo">
+          <label for="protocolo">Protocolo do acionamento <span class="req">*</span></label>
+          <div class="hint">Encontre o número no comprovante recebido por e-mail ou WhatsApp (ex: AC-20260320-143052)</div>
+          <div class="protocolo-wrapper">
+            <input type="text" id="protocolo" placeholder="AC-AAAAMMDD-HHMMSS"
+              maxlength="22" autocomplete="off"
+              oninput="onProtocoloInput(this)"
+              onfocus="this.value = this.value.toUpperCase()">
+            <span class="protocolo-status" id="protocolo-status"></span>
+          </div>
+          <div class="msg-erro" id="erro-protocolo">Informe um protocolo válido.</div>
+
+          <!-- Preview dos dados do acionamento -->
+          <div id="preview-acionamento">
+            <div class="preview-linha">
+              <span class="preview-label">Plantonista</span>
+              <span class="preview-valor" id="prev-nome">—</span>
+            </div>
+            <div class="preview-linha">
+              <span class="preview-label">Hospital</span>
+              <span class="preview-valor" id="prev-hospital">—</span>
+            </div>
+            <div class="preview-linha">
+              <span class="preview-label">Data do plantão</span>
+              <span class="preview-valor" id="prev-data">—</span>
+            </div>
+            <div class="preview-linha">
+              <span class="preview-label">Turno</span>
+              <span class="preview-valor" id="prev-turno">—</span>
+            </div>
+            <div id="prazo-linha" class="preview-linha" style="margin-top:8px; border-top:1px solid var(--cinza-2); padding-top:8px;">
+              <span class="preview-label">Status do atestado</span>
+              <span class="preview-valor" id="prev-prazo">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="campo-grupo">
+          <label for="nome-confirm">Confirme seu nome completo <span class="req">*</span></label>
+          <div class="hint">Para segurança, confirme que você é o plantonista do acionamento</div>
+          <input type="text" id="nome-confirm" placeholder="Seu nome conforme cadastro">
+          <div class="msg-erro" id="erro-nome">Informe seu nome completo.</div>
+        </div>
+
+        <div class="campo-grupo">
+          <label for="email-confirm">E-mail <span class="req">*</span></label>
+          <div class="hint">A confirmação de recebimento será enviada para este endereço</div>
+          <input type="email" id="email-confirm" placeholder="seu@email.com">
+          <div class="msg-erro" id="erro-email">Informe um e-mail válido.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 2: Upload -->
+    <div class="card">
+      <div class="card-header">
+        <div class="num">2</div>
+        <h2>Atestado médico</h2>
+      </div>
+      <div class="card-body">
+        <div class="campo-grupo">
+          <label>Arquivo do atestado <span class="req">*</span></label>
+          <div class="hint">Foto nítida ou scan do atestado. Formatos: JPG, PNG, PDF — máx. 10 MB</div>
+
+          <div class="upload-zone" id="upload-zone"
+            onclick="document.getElementById('arquivo-input').click()"
+            ondragover="onDragOver(event)"
+            ondragleave="onDragLeave(event)"
+            ondrop="onDrop(event)">
+            <div class="upload-icon" id="upload-icon">📋</div>
+            <div class="upload-titulo" id="upload-titulo">Toque para selecionar o atestado</div>
+            <div class="upload-sub" id="upload-sub">ou arraste o arquivo aqui<br><strong>JPG, PNG ou PDF até 10 MB</strong></div>
+          </div>
+          <input type="file" id="arquivo-input" accept="image/*,.pdf" style="display:none" onchange="onArquivoSelecionado(this)">
+          <div class="msg-erro" id="erro-arquivo">Anexe o atestado médico para continuar.</div>
+
+          <div class="arquivo-info" id="arquivo-info">
+            <div class="arquivo-thumb" id="arquivo-thumb">📄</div>
+            <div style="flex:1">
+              <div class="arquivo-nome" id="arquivo-nome">—</div>
+              <div class="arquivo-tam" id="arquivo-tam">—</div>
+            </div>
+            <button type="button" class="btn-remover" onclick="removerArquivo()">✕</button>
+          </div>
+          <img id="img-preview" alt="Preview do atestado">
+          <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+        </div>
+
+        <div class="campo-grupo" style="margin-top:4px">
+          <label for="obs-atestado">Observações sobre o atestado</label>
+          <div class="hint">Ex: "atestado de 3 dias por síndrome gripal", número do CRM do médico, etc.</div>
+          <input type="text" id="obs-atestado" placeholder="Opcional…">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-enviar" id="btn-enviar">
+      <div class="spinner"></div>
+      <span class="btn-txt">Enviar atestado</span>
+    </button>
+
+    <div class="info-rodape">
+      O atestado será encaminhado à Comissão de Plantões e vinculado ao protocolo informado.<br>
+      Você receberá uma confirmação de recebimento por e-mail.
+    </div>
+
+  </form>
+</div>
+
+<!-- ════ TELA 2: SUCESSO ════ -->
+<div id="tela-sucesso" class="wrapper">
+
+  <div class="sucesso-hero">
+    <div class="sucesso-check">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Atestado recebido!</h2>
+    <p>O documento foi vinculado ao seu protocolo com sucesso.</p>
+  </div>
+
+  <div class="sucesso-detalhe">
+    <div class="linha"><span class="sl">Protocolo</span><span class="sv" id="suc-protocolo">—</span></div>
+    <div class="linha"><span class="sl">Plantonista</span><span class="sv" id="suc-nome">—</span></div>
+    <div class="linha"><span class="sl">Arquivo enviado</span><span class="sv" id="suc-arquivo">—</span></div>
+    <div class="linha"><span class="sl">Recebido em</span><span class="sv" id="suc-datahora">—</span></div>
+    <div class="linha"><span class="sl">Encaminhado para</span><span class="sv">Comissão de Plantões</span></div>
+    <div class="linha"><span class="sl">Status do protocolo</span>
+      <span class="sv" style="color:var(--verde); font-weight:600;">✓ Documentação regularizada</span>
+    </div>
+  </div>
+
+  <div style="background:var(--verde-pale); border-radius:var(--r); padding:14px 16px; font-size:13px; margin-bottom:14px;">
+    <strong style="display:block; color:var(--verde); font-size:12px; text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px;">Próximos passos</strong>
+    <ol style="padding-left:18px; color:var(--texto); line-height:1.8;">
+      <li>A Comissão de Plantões analisará o atestado</li>
+      <li>Você receberá confirmação por e-mail em até 24h úteis</li>
+      <li>Em caso de dúvidas: <strong><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="44253021373025202b3704272b2b34252a21373034216a272b296a2636">[email&#160;protected]</a></strong></li>
+    </ol>
+  </div>
+
+  <button class="btn-voltar" onclick="reiniciar()">↩ Enviar outro atestado</button>
+
+  <div class="info-rodape">
+    COOPANEST-PE — Comissão de Plantões<br>
+    Os alertas automáticos foram interrompidos para este protocolo.
+  </div>
+
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec"; // mesma URL do index.html
+
+// Simula banco local de protocolos para validação offline
+// Em produção, a validação real vem do Apps Script via doGet
+const FORMATO_PROTOCOLO = /^AC-\d{8}-\d{6}$/;
+
+let arquivoSelecionado = null;
+let dadosProtocolo     = null;
+
+// ── Formata input do protocolo em tempo real
+function onProtocoloInput(el) {
+  let v = el.value.toUpperCase().replace(/[^AC0-9\-]/g, "");
+  el.value = v;
+
+  const status = document.getElementById("protocolo-status");
+  const preview = document.getElementById("preview-acionamento");
+
+  if (FORMATO_PROTOCOLO.test(v)) {
+    buscarProtocolo(v);
+  } else {
+    status.className = "protocolo-status";
+    preview.classList.remove("vis");
+    dadosProtocolo = null;
+  }
+}
+
+// ── Busca dados do protocolo no Apps Script
+async function buscarProtocolo(protocolo) {
+  const status  = document.getElementById("protocolo-status");
+  const preview = document.getElementById("preview-acionamento");
+
+  status.textContent = "Buscando…";
+  status.className   = "protocolo-status encontrado";
+
+  try {
+    if (APPS_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
+      // Modo demo — simula retorno
+      await new Promise(r => setTimeout(r, 600));
+      dadosProtocolo = {
+        protocolo,
+        nome:      "Plantonista Demo",
+        hospital:  "Hospital da Restauração — Urgência (HR)",
+        data:      "20/03/2026",
+        turno:     "Diurno (07h–19h)",
+        prazo:     new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString(),
+        statusAtestado: "Pendente"
+      };
+    } else {
+      const url  = APPS_SCRIPT_URL + "?action=buscarProtocolo&protocolo=" + encodeURIComponent(protocolo);
+      const resp = await fetch(url);
+      const json = await resp.json();
+      if (!json.encontrado) {
+        status.textContent = "Não encontrado";
+        status.className   = "protocolo-status nao-encontrado";
+        preview.classList.remove("vis");
+        dadosProtocolo = null;
+        return;
+      }
+      dadosProtocolo = json.dados;
+    }
+
+    // Preenche preview
+    document.getElementById("prev-nome").textContent    = dadosProtocolo.nome;
+    document.getElementById("prev-hospital").textContent= dadosProtocolo.hospital;
+    document.getElementById("prev-data").textContent    = dadosProtocolo.data;
+    document.getElementById("prev-turno").textContent   = dadosProtocolo.turno;
+
+    // Status do prazo
+    const prazoEl   = document.getElementById("prev-prazo");
+    const agora     = new Date();
+    const prazo     = dadosProtocolo.prazo ? new Date(dadosProtocolo.prazo) : null;
+    const horasRest = prazo ? (prazo - agora) / 1000 / 3600 : null;
+
+    if (dadosProtocolo.statusAtestado === "Recebido") {
+      prazoEl.innerHTML = '<span class="prazo-badge ok">✓ Atestado já recebido</span>';
+    } else if (!prazo || dadosProtocolo.statusAtestado === "Vencido — escalado") {
+      prazoEl.innerHTML = '<span class="prazo-badge vencido">⚠ Prazo vencido — envio ainda assim registrado</span>';
+    } else if (horasRest <= 6) {
+      prazoEl.innerHTML = `<span class="prazo-badge urgente">⏱ Urgente — ${Math.round(horasRest)}h restantes</span>`;
+    } else {
+      prazoEl.innerHTML = `<span class="prazo-badge ok">Dentro do prazo — ${Math.round(horasRest)}h restantes</span>`;
+    }
+
+    status.textContent = "✓ Encontrado";
+    status.className   = "protocolo-status encontrado";
+    preview.classList.add("vis");
+
+  } catch (err) {
+    status.textContent = "Erro de conexão";
+    status.className   = "protocolo-status nao-encontrado";
+  }
+}
+
+// ── Upload
+function onArquivoSelecionado(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    alert("Arquivo muito grande. Máximo: 10 MB.");
+    return;
+  }
+  arquivoSelecionado = file;
+  mostrarArquivo(file);
+}
+
+function mostrarArquivo(file) {
+  const zone  = document.getElementById("upload-zone");
+  const info  = document.getElementById("arquivo-info");
+  const thumb = document.getElementById("arquivo-thumb");
+  const nome  = document.getElementById("arquivo-nome");
+  const tam   = document.getElementById("arquivo-tam");
+  const prev  = document.getElementById("img-preview");
+
+  zone.classList.add("tem-arquivo");
+  document.getElementById("upload-icon").textContent = "✅";
+  document.getElementById("upload-titulo").textContent = "Arquivo selecionado";
+  document.getElementById("upload-sub").textContent = "Clique para trocar";
+
+  nome.textContent = file.name;
+  tam.textContent  = (file.size / 1024).toFixed(0) + " KB";
+
+  if (file.type.startsWith("image/")) {
+    thumb.textContent = "🖼️";
+    const reader = new FileReader();
+    reader.onload = e => { prev.src = e.target.result; prev.classList.add("vis"); };
+    reader.readAsDataURL(file);
+  } else {
+    thumb.textContent = "📄";
+    prev.classList.remove("vis");
+  }
+
+  info.classList.add("vis");
+  document.getElementById("erro-arquivo").style.display = "none";
+}
+
+function removerArquivo() {
+  arquivoSelecionado = null;
+  document.getElementById("arquivo-input").value = "";
+  document.getElementById("arquivo-info").classList.remove("vis");
+  document.getElementById("img-preview").classList.remove("vis");
+  document.getElementById("upload-zone").classList.remove("tem-arquivo");
+  document.getElementById("upload-icon").textContent = "📋";
+  document.getElementById("upload-titulo").textContent = "Toque para selecionar o atestado";
+  document.getElementById("upload-sub").innerHTML = 'ou arraste o arquivo aqui<br><strong>JPG, PNG ou PDF até 10 MB</strong>';
+}
+
+function onDragOver(e) { e.preventDefault(); document.getElementById("upload-zone").classList.add("drag"); }
+function onDragLeave() { document.getElementById("upload-zone").classList.remove("drag"); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById("upload-zone").classList.remove("drag");
+  const file = e.dataTransfer.files[0];
+  if (file) { arquivoSelecionado = file; mostrarArquivo(file); }
+}
+
+// ── Validação
+function validar() {
+  let ok = true;
+
+  const prot = document.getElementById("protocolo").value.trim();
+  if (!FORMATO_PROTOCOLO.test(prot)) {
+    document.getElementById("protocolo").classList.add("erro");
+    document.getElementById("erro-protocolo").classList.add("vis");
+    ok = false;
+  } else {
+    document.getElementById("protocolo").classList.remove("erro");
+    document.getElementById("erro-protocolo").classList.remove("vis");
+  }
+
+  const nome = document.getElementById("nome-confirm").value.trim();
+  if (nome.length < 3) {
+    document.getElementById("nome-confirm").classList.add("erro");
+    document.getElementById("erro-nome").classList.add("vis");
+    ok = false;
+  } else {
+    document.getElementById("nome-confirm").classList.remove("erro");
+    document.getElementById("erro-nome").classList.remove("vis");
+  }
+
+  const email = document.getElementById("email-confirm").value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById("email-confirm").classList.add("erro");
+    document.getElementById("erro-email").classList.add("vis");
+    ok = false;
+  } else {
+    document.getElementById("email-confirm").classList.remove("erro");
+    document.getElementById("erro-email").classList.remove("vis");
+  }
+
+  if (!arquivoSelecionado) {
+    document.getElementById("erro-arquivo").classList.add("vis");
+    ok = false;
+  } else {
+    document.getElementById("erro-arquivo").classList.remove("vis");
+  }
+
+  return ok;
+}
+
+// ── Submit
+document.getElementById("form-atestado").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  if (!validar()) return;
+
+  const btn = document.getElementById("btn-enviar");
+  btn.classList.add("loading");
+  btn.disabled = true;
+
+  // Simula upload com barra de progresso
+  const progressWrap = document.getElementById("progress-wrap");
+  const progressBar  = document.getElementById("progress-bar");
+  progressWrap.classList.add("vis");
+
+  // Converte arquivo para base64
+  const base64 = await new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload  = e => res(e.target.result.split(",")[1]);
+    reader.onerror = rej;
+    reader.readAsDataURL(arquivoSelecionado);
+  });
+
+  // Anima barra
+  for (let p = 0; p <= 90; p += 10) {
+    await new Promise(r => setTimeout(r, 80));
+    progressBar.style.width = p + "%";
+  }
+
+  const agora    = new Date();
+  const pad      = x => String(x).padStart(2,"0");
+  const dataHora = `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} às ${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+
+  const payload = {
+    action:        "receberAtestado",
+    protocolo:     document.getElementById("protocolo").value.trim().toUpperCase(),
+    nome:          document.getElementById("nome-confirm").value.trim(),
+    email:         document.getElementById("email-confirm").value.trim(),
+    nomeArquivo:   arquivoSelecionado.name,
+    tipoArquivo:   arquivoSelecionado.type,
+    base64Arquivo: base64,
+    obs:           document.getElementById("obs-atestado").value.trim(),
+    dataHora
+  };
+
+  try {
+    if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+  } catch (err) {
+    console.warn("Apps Script indisponível:", err);
+  }
+
+  progressBar.style.width = "100%";
+  await new Promise(r => setTimeout(r, 300));
+
+  // Preenche tela de sucesso
+  document.getElementById("suc-protocolo").textContent = payload.protocolo;
+  document.getElementById("suc-nome").textContent      = payload.nome;
+  document.getElementById("suc-arquivo").textContent   = payload.nomeArquivo;
+  document.getElementById("suc-datahora").textContent  = dataHora;
+
+  document.getElementById("tela-form").style.display = "none";
+  const telaSuc = document.getElementById("tela-sucesso");
+  telaSuc.style.display = "block";
+  telaSuc.classList.add("vis");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+function reiniciar() {
+  document.getElementById("form-atestado").reset();
+  removerArquivo();
+  arquivoSelecionado = null;
+  dadosProtocolo     = null;
+  document.getElementById("preview-acionamento").classList.remove("vis");
+  document.getElementById("protocolo-status").className = "protocolo-status";
+  document.getElementById("progress-wrap").classList.remove("vis");
+  document.getElementById("progr

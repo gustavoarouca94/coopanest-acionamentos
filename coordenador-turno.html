@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a5c3a">
+<title>COOPANEST-PE — Coordenador de Turno</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde:        #0a5c3a;
+  --verde-mid:    #0d7a4e;
+  --verde-dark:   #073d28;
+  --verde-light:  #e8f5ef;
+  --verde-pale:   #f2faf6;
+  --branco:       #ffffff;
+  --cinza-0:      #f4f6f5;
+  --cinza-1:      #ebeeed;
+  --cinza-2:      #d6dbd8;
+  --cinza-3:      #a8b3ae;
+  --cinza-4:      #6b7570;
+  --texto:        #1a2420;
+  --alerta:       #c8530a;
+  --alerta-bg:    #fff4ee;
+  --erro:         #b91c1c;
+  --info:         #1d5fa5;
+  --info-bg:      #eaf1fb;
+  --amarelo:      #b07800;
+  --amarelo-bg:   #fefbea;
+  --r:            10px;
+  --r-lg:         16px;
+  --r-xl:         20px;
+  --sombra:       0 2px 16px rgba(10,92,58,.07);
+  --sombra-md:    0 4px 24px rgba(10,92,58,.11);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cinza-0);
+  color: var(--texto);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--verde);
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 20px rgba(0,0,0,.2);
+}
+.header-inner {
+  max-width: 780px; margin: 0 auto;
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,.15); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-logo svg { width: 22px; height: 22px; fill: white; }
+.header-title h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; color: white; font-weight: 400; line-height: 1.2;
+}
+.header-title p { font-size: 11px; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .5px; }
+.turno-badge {
+  background: rgba(255,255,255,.15);
+  color: white; border-radius: 20px;
+  padding: 5px 12px; font-size: 12px; font-weight: 600;
+  display: none; align-items: center; gap: 6px;
+}
+.turno-badge.vis { display: flex; }
+.turno-badge .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #4ade80; animation: pulsar 1.5s infinite;
+}
+@keyframes pulsar { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── WRAPPER ── */
+.wrapper { max-width: 780px; margin: 0 auto; padding: 24px 16px 80px; }
+
+/* ══════════════════════════════
+   TELA INICIAL — INICIAR TURNO
+══════════════════════════════ */
+#tela-inicio { animation: fadeUp .35s ease both; }
+.inicio-hero {
+  background: var(--verde);
+  border-radius: var(--r-xl);
+  padding: 32px 28px;
+  margin-bottom: 20px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.inicio-hero::before {
+  content: "";
+  position: absolute; top: -40px; right: -40px;
+  width: 200px; height: 200px;
+  background: rgba(255,255,255,.05);
+  border-radius: 50%;
+}
+.inicio-hero h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 26px; font-weight: 400; margin-bottom: 6px;
+}
+.inicio-hero p { font-size: 14px; opacity: .8; max-width: 400px; line-height: 1.5; }
+
+.card {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); overflow: hidden; margin-bottom: 14px;
+}
+.card-header {
+  background: var(--verde-light);
+  border-bottom: 1px solid var(--cinza-1);
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 10px;
+}
+.card-header .num {
+  background: var(--verde); color: white;
+  width: 24px; height: 24px; border-radius: 50%;
+  font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.card-header h2 { font-size: 14px; font-weight: 600; color: var(--verde); }
+.card-body { padding: 18px; }
+
+.campo-grupo { margin-bottom: 16px; }
+.campo-grupo:last-child { margin-bottom: 0; }
+.campo-grupo label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--texto); margin-bottom: 5px;
+}
+.campo-grupo label .req { color: var(--verde-mid); }
+.campo-grupo .hint { font-size: 11.5px; color: var(--cinza-4); margin-bottom: 5px; line-height: 1.4; }
+
+input[type="text"], input[type="date"], input[type="time"], select, textarea {
+  width: 100%; padding: 10px 13px;
+  border: 1.5px solid var(--cinza-1); border-radius: var(--r);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--texto);
+  background: white;
+  transition: border-color .15s, box-shadow .15s;
+  appearance: none; -webkit-appearance: none;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--verde-mid);
+  box-shadow: 0 0 0 3px rgba(13,122,78,.1);
+}
+input.erro, select.erro { border-color: var(--erro); }
+.msg-erro { font-size: 12px; color: var(--erro); margin-top: 4px; display: none; }
+.msg-erro.vis { display: block; }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7570' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+}
+textarea { resize: vertical; min-height: 72px; }
+.dois-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .dois-col { grid-template-columns: 1fr; } }
+
+.btn-primary {
+  width: 100%; padding: 14px;
+  background: var(--verde); color: white; border: none;
+  border-radius: var(--r-lg); font-family: 'DM Sans', sans-serif;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+  box-shadow: 0 4px 16px rgba(10,92,58,.28);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-primary:hover { background: var(--verde-mid); }
+.btn-primary:disabled { background: var(--cinza-3); box-shadow: none; cursor: not-allowed; }
+
+/* ══════════════════════════════
+   TELA PRINCIPAL DO TURNO
+══════════════════════════════ */
+#tela-turno { display: none; animation: fadeUp .35s ease both; }
+#tela-turno.vis { display: block; }
+
+/* Info do turno ativo */
+.turno-info {
+  background: var(--verde);
+  border-radius: var(--r-xl);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap;
+}
+.turno-info-left h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px; color: white; font-weight: 400;
+}
+.turno-info-left p { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
+.turno-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.chip {
+  background: rgba(255,255,255,.15);
+  color: rgba(255,255,255,.9);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 12px; font-weight: 500;
+}
+
+/* Contador */
+.contador-bar {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra);
+  padding: 14px 18px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 16px;
+}
+.contador-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 36px; color: var(--verde); line-height: 1; flex-shrink: 0;
+}
+.contador-label { font-size: 13px; color: var(--cinza-4); }
+.contador-label strong { display: block; font-size: 15px; color: var(--texto); }
+
+/* Lista de acionamentos */
+.lista-acionamentos { margin-bottom: 14px; }
+.item-acionamento {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); margin-bottom: 10px;
+  overflow: hidden; animation: fadeUp .25s ease both;
+}
+.item-header {
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--cinza-1);
+}
+.item-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.item-num.formulario { background: var(--verde-light); color: var(--verde); }
+.item-num.manual     { background: var(--info-bg);     color: var(--info); }
+.item-titulo { flex: 1; }
+.item-titulo strong { font-size: 14px; display: block; }
+.item-titulo span   { font-size: 12px; color: var(--cinza-4); }
+.item-tag {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 20px; flex-shrink: 0;
+}
+.item-tag.form  { background: var(--verde-light); color: var(--verde); }
+.item-tag.man   { background: var(--info-bg);     color: var(--info); }
+.item-tag.conf  { background: #dcfce7; color: #166534; }
+.item-tag.recus { background: #fef2f2; color: var(--erro); }
+
+.item-body { padding: 12px 16px; }
+.item-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+}
+@media (max-width: 480px) { .item-grid { grid-template-columns: 1fr; } }
+.item-campo { font-size: 13px; }
+.item-campo .ic-label { font-size: 11px; color: var(--cinza-4); margin-bottom: 1px; text-transform: uppercase; letter-spacing: .5px; }
+.item-campo .ic-valor { font-weight: 500; color: var(--texto); }
+
+.item-acoes {
+  padding: 10px 16px;
+  border-top: 1px solid var(--cinza-1);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.btn-sm {
+  padding: 6px 14px; border-radius: 8px;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; transition: all .15s;
+}
+.btn-editar  { background: var(--cinza-1); color: var(--texto); }
+.btn-excluir { background: #fef2f2;        color: var(--erro); }
+.btn-editar:hover  { background: var(--cinza-2); }
+.btn-excluir:hover { background: #fee2e2; }
+
+/* Botão adicionar */
+.btn-adicionar {
+  width: 100%; padding: 14px;
+  background: white; color: var(--verde);
+  border: 2px dashed var(--verde-mid); border-radius: var(--r-lg);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 14px;
+}
+.btn-adicionar:hover { background: var(--verde-pale); border-style: solid; }
+
+/* ══════════════════════════════
+   MODAL DE ACIONAMENTO
+══════════════════════════════ */
+.modal-overlay {
+  display: none; position: fixed;
+  inset: 0; background: rgba(0,0,0,.45);
+  z-index: 500; align-items: flex-end;
+  animation: fadeIn .2s ease;
+}
+.modal-overlay.vis { display: flex; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+.modal {
+  background: white; width: 100%; max-width: 780px;
+  margin: 0 auto; border-radius: var(--r-xl) var(--r-xl) 0 0;
+  max-height: 92vh; overflow-y: auto;
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+.modal-header {
+  background: var(--verde); padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.modal-header h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 17px; color: white; font-weight: 400;
+}
+.btn-fechar {
+  background: rgba(255,255,255,.15); border: none; border-radius: 8px;
+  color: white; width: 32px; height: 32px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; transition: background .15s;
+}
+.btn-fechar:hover { background: rgba(255,255,255,.25); }
+.modal-body { padding: 20px; }
+
+/* Alerta protocolo vinculado */
+.alerta-vinculo {
+  background: var(--verde-pale); border: 1.5px solid var(--cinza-1);
+  border-left: 3px solid var(--verde);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 10px 13px; margin-bottom: 16px;
+  font-size: 13px; display: none;
+}
+.alerta-vinculo.vis { display: block; }
+
+/* Status selector */
+.status-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.status-opt {
+  border: 2px solid var(--cinza-1); border-radius: var(--r);
+  padding: 10px 14px; cursor: pointer; text-align: center;
+  font-size: 13px; font-weight: 600; transition: all .15s;
+  color: var(--cinza-4);
+}
+.status-opt:hover { border-color: var(--cinza-3); }
+.status-opt.confirmado.sel { border-color: #16a34a; background: #dcfce7; color: #166534; }
+.status-opt.recusado.sel  { border-color: var(--erro); background: #fef2f2; color: var(--erro); }
+
+/* Protocolo search */
+.protocolo-search {
+  display: flex; gap: 8px;
+}
+.protocolo-search input { flex: 1; }
+.btn-buscar {
+  padding: 10px 16px; background: var(--verde); color: white;
+  border: none; border-radius: var(--r); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  white-space: nowrap; transition: background .15s;
+}
+.btn-buscar:hover { background: var(--verde-mid); }
+
+/* ══════════════════════════════
+   OBSERVAÇÕES DO TURNO
+══════════════════════════════ */
+.obs-turno {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); padding: 18px; margin-bottom: 14px;
+}
+.obs-turno h3 {
+  font-size: 13px; font-weight: 600; color: var(--verde);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px;
+}
+
+/* ══════════════════════════════
+   BOTÃO CONCLUIR TURNO
+══════════════════════════════ */
+.btn-concluir {
+  width: 100%; padding: 16px;
+  background: var(--verde-dark); color: white; border: none;
+  border-radius: var(--r-lg); font-family: 'DM Sans', sans-serif;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+  box-shadow: 0 4px 20px rgba(7,61,40,.3);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.btn-concluir:hover { background: var(--verde); }
+.btn-concluir .spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: white; border-radius: 50%;
+  animation: spin .7s linear infinite; display: none;
+}
+.btn-concluir.loading .spinner { display: block; }
+.btn-concluir.loading .btn-txt { display: none; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ══════════════════════════════
+   TELA DE CONCLUSÃO
+══════════════════════════════ */
+#tela-conclusao { display: none; animation: fadeUp .35s ease both; }
+#tela-conclusao.vis { display: block; }
+
+.conclusao-hero {
+  background: var(--verde-dark); border-radius: var(--r-xl);
+  padding: 32px 24px; text-align: center; color: white; margin-bottom: 16px;
+}
+.conclusao-check {
+  width: 64px; height: 64px; background: rgba(255,255,255,.15);
+  border-radius: 50%; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.conclusao-check svg { width: 32px; height: 32px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.conclusao-hero h2 { font-family: 'DM Serif Display', serif; font-size: 24px; font-weight: 400; margin-bottom: 6px; }
+.conclusao-hero p { font-size: 13px; opacity: .8; }
+
+.resumo-turno {
+  background: white; border-radius: var(--r-lg);
+  box-shadow: var(--sombra); padding: 20px; margin-bottom: 14px;
+}
+.resumo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.resumo-stat {
+  background: var(--verde-pale); border-radius: var(--r);
+  padding: 14px; text-align: center;
+}
+.resumo-stat .rs-num { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--verde); }
+.resumo-stat .rs-label { font-size: 11px; color: var(--cinza-4); text-transform: uppercase; letter-spacing: .5px; }
+
+.btn-novo-turno {
+  width: 100%; padding: 13px; background: var(--cinza-0);
+  color: var(--texto); border: 1.5px solid var(--cinza-1);
+  border-radius: var(--r); font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-novo-turno:hover { background: var(--cinza-1); }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-logo" style="background:transparent; padding:0; width:52px; height:36px; display:flex; align-items:center; justify-content:center; background-color:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+      <svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- Padrão de pontos da marca COOPANEST -->
+  <!-- Coluna 1 (esquerda, baixo) -->
+  <circle cx="6" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="6" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="6" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <!-- Coluna 2 -->
+  <circle cx="16" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="16" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="16" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="16" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 3 -->
+  <circle cx="26" cy="32" r="4.5" fill="white" opacity="1"/>
+  <circle cx="26" cy="22" r="3.5" fill="white" opacity=".85"/>
+  <circle cx="26" cy="13" r="2.5" fill="white" opacity=".6"/>
+  <circle cx="26" cy="6"  r="1.8" fill="white" opacity=".4"/>
+  <!-- Coluna 4 (direita, menor) -->
+  <circle cx="35" cy="32" r="3"   fill="white" opacity=".9"/>
+  <circle cx="35" cy="22" r="2.5" fill="white" opacity=".7"/>
+  <circle cx="35" cy="13" r="1.8" fill="white" opacity=".45"/>
+</svg>
+    </div>
+      <div class="header-title">
+        <h1>COOPANEST-PE</h1>
+        <p>Coordenador de Turno</p>
+      </div>
+    </div>
+    <div class="turno-badge" id="turno-badge">
+      <span class="dot"></span>
+      <span id="badge-txt">Turno ativo</span>
+    </div>
+  </div>
+</header>
+
+<!-- ════ TELA 1: INICIAR TURNO ════ -->
+<div id="tela-inicio" class="wrapper">
+  <div class="inicio-hero">
+    <h2>Registro de turno</h2>
+    <p>Preencha os dados do turno para começar a registrar os acionamentos.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="num">1</div>
+      <h2>Dados do turno</h2>
+    </div>
+    <div class="card-body">
+      <div class="dois-col">
+        <div class="campo-grupo">
+          <label for="data-turno">Data do turno <span class="req">*</span></label>
+          <input type="date" id="data-turno">
+          <div class="msg-erro" id="erro-data">Informe a data.</div>
+        </div>
+        <div class="campo-grupo">
+          <label for="tipo-turno">Turno <span class="req">*</span></label>
+          <select id="tipo-turno">
+            <option value="">Selecione…</option>
+            <option value="Diurno (07h–19h)">Diurno (07h–19h)</option>
+            <option value="Noturno (19h–07h)">Noturno (19h–07h)</option>
+          </select>
+          <div class="msg-erro" id="erro-turno">Selecione o turno.</div>
+        </div>
+      </div>
+      <div class="campo-grupo">
+        <label for="coord-nome">Seu nome (coordenador responsável) <span class="req">*</span></label>
+        <input type="text" id="coord-nome" placeholder="Nome completo">
+        <div class="msg-erro" id="erro-coord">Informe seu nome.</div>
+      </div>
+      <div class="campo-grupo">
+        <label for="num-reservas">Nº de reservas escalados neste turno <span class="req">*</span></label>
+        <input type="text" id="num-reservas" placeholder="Ex: 8" inputmode="numeric">
+        <div class="msg-erro" id="erro-reservas">Informe o número.</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="iniciarTurno()">
+    Iniciar registro do turno →
+  </button>
+</div>
+
+<!-- ════ TELA 2: TURNO ATIVO ════ -->
+<div id="tela-turno" class="wrapper">
+
+  <div class="turno-info">
+    <div class="turno-info-left">
+      <h3 id="ti-titulo">Turno</h3>
+      <p id="ti-coord">Coordenador</p>
+      <div class="turno-chips">
+        <span class="chip" id="ti-data">—</span>
+        <span class="chip" id="ti-reservas">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="contador-bar">
+    <div class="contador-num" id="contador-num">0</div>
+    <div class="contador-label">
+      <strong id="contador-label-txt">Nenhum acionamento registrado</strong>
+      Clique em "Adicionar acionamento" para registrar
+    </div>
+  </div>
+
+  <div class="lista-acionamentos" id="lista-acionamentos"></div>
+
+  <button class="btn-adicionar" onclick="abrirModal()">
+    + Adicionar acionamento
+  </button>
+
+  <div class="obs-turno">
+    <h3>Observações gerais do turno</h3>
+    <textarea id="obs-turno-geral" placeholder="Intercorrências, situações relevantes, comentários sobre o turno…" rows="3"></textarea>
+  </div>
+
+  <button class="btn-concluir" id="btn-concluir" onclick="concluirTurno()">
+    <div class="spinner"></div>
+    <span class="btn-txt">Concluir turno e enviar relatório</span>
+  </button>
+</div>
+
+<!-- ════ MODAL: ADICIONAR ACIONAMENTO ════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="fecharModalFora(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h3 id="modal-titulo">Novo acionamento</h3>
+      <button class="btn-fechar" onclick="fecharModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Seletor de modo: Protocolo vs Manual -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:18px;">
+        <div id="modo-protocolo-btn" onclick="selecionarModo('protocolo')"
+          style="border:2px solid var(--verde); border-radius:var(--r); padding:12px; text-align:center; cursor:pointer; background:var(--verde-light);">
+          <div style="font-size:16px; margin-bottom:4px;">📋</div>
+          <div style="font-size:13px; font-weight:600; color:var(--verde);">Via protocolo</div>
+          <div style="font-size:11px; color:var(--cinza-4); margin-top:2px;">Plantonista enviou comprovante</div>
+        </div>
+        <div id="modo-manual-btn" onclick="selecionarModo('manual')"
+          style="border:2px solid var(--cinza-2); border-radius:var(--r); padding:12px; text-align:center; cursor:pointer; background:white;">
+          <div style="font-size:16px; margin-bottom:4px;">✏️</div>
+          <div style="font-size:13px; font-weight:600; color:var(--cinza-4);">Lançamento manual</div>
+          <div style="font-size:11px; color:var(--cinza-4); margin-top:2px;">Nova vaga ou sem comprovante</div>
+        </div>
+      </div>
+
+      <!-- Busca por protocolo (modo protocolo) -->
+      <div id="bloco-protocolo" class="campo-grupo">
+        <label>Protocolo do plantonista</label>
+        <div class="hint">Insira o protocolo do comprovante recebido via WhatsApp para pré-preencher os dados</div>
+        <div class="protocolo-search">
+          <input type="text" id="modal-protocolo" placeholder="AC-AAAAMMDD-HHMMSS" style="text-transform:uppercase; letter-spacing:1px; font-size:13px;" oninput="this.value=this.value.toUpperCase()">
+          <button class="btn-buscar" onclick="buscarProtocolo()">Buscar</button>
+        </div>
+        <div id="alerta-vinculo" class="alerta-vinculo">
+          <strong style="color:var(--verde)">✓ Protocolo vinculado</strong><br>
+          <span id="vinculo-info"></span>
+        </div>
+      </div>
+
+      <!-- Aviso modo manual -->
+      <div id="bloco-aviso-manual" style="display:none; background:var(--info-bg); border-left:3px solid var(--info); border-radius:0 var(--r) var(--r) 0; padding:10px 13px; margin-bottom:16px; font-size:13px; color:#1d3a6b;">
+        <strong>Lançamento manual</strong> — preencha todos os campos abaixo. Este registro ficará marcado como "Manual" na planilha para fins de auditoria.
+      </div>
+
+      <hr style="border:none; border-top:1px solid var(--cinza-1); margin:0 0 16px;">
+
+      <!-- Dados do acionamento -->
+      <div class="dois-col">
+        <div class="campo-grupo">
+          <label for="m-plantonista-saiu">Plantonista que saiu <span class="req">*</span></label>
+          <input type="text" id="m-plantonista-saiu" placeholder="Nome completo">
+          <div class="msg-erro" id="erro-m-saiu">Campo obrigatório.</div>
+        </div>
+        <div class="campo-grupo">
+          <label for="m-ano-coop">Ano do cooperado</label>
+          <select id="m-ano-coop">
+            <option value="">Selecione…</option>
+            <option>1º ano PO</option>
+            <option>2º ano PO</option>
+            <option>3º ano PO</option>
+            <option>4º ano PO</option>
+            <option>5º ano PO</option>
+            <option>Cooperado efetivo</option>
+            <option>Funcionário do serviço</option>
+            <option>Voluntário</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="dois-col">
+        <div class="campo-grupo">
+          <label for="m-hospital">Hospital <span class="req">*</span></label>
+          <select id="m-hospital">
+            <option value="">Selecione…</option>
+            <option>Hospital da Restauração — Urgência (HR)</option>
+            <option>Hospital da Restauração — Imagem (HR Imagem)</option>
+            <option>Hospital da Restauração — Hemodinâmica</option>
+            <option>Hospital da Restauração — Queimados</option>
+            <option>Hospital da Restauração — Neurocirurgia</option>
+            <option>Hospital Getúlio Vargas (HGV)</option>
+            <option>Hospital Otávio de Freitas — Emergência (HOF)</option>
+            <option>Hospital Otávio de Freitas — SRPA Ortopedia</option>
+            <option>Hospital Pelópidas da Silveira (HPS)</option>
+            <option>Hospital Dom Hélder Câmara (HDH)</option>
+            <option>Hospital Miguel Arraes (HMA)</option>
+            <option>Hospital do Idoso</option>
+            <option>IMIP / Pedro II / Oscar Coutinho — SR e Urgências</option>
+            <option>IMIP Maternidade</option>
+            <option>Maternidade CISAM</option>
+            <option>Hospital Barão de Lucena (HBL)</option>
+            <option>Hospital Agamenon Magalhães (HAM)</option>
+            <option>HAM — Hemodinâmica</option>
+            <option>Hospital Alfa</option>
+            <option>HUOC — SRPA Bloco A</option>
+            <option>HUOC — SRPA Bloco B</option>
+            <option>HUOC — Tomografia</option>
+            <option>HUOC — Braquiterapia</option>
+            <option>PROCAPE</option>
+            <option>HSE (SRPA + Urgências)</option>
+            <option>Outro</option>
+          </select>
+          <div class="msg-erro" id="erro-m-hospital">Campo obrigatório.</div>
+        </div>
+      </div>
+
+      <div class="dois-col">
+        <div class="campo-grupo">
+          <label for="m-setor">Setor / Sala</label>
+          <input type="text" id="m-setor" placeholder="Ex: UTI, CC, SRPA, Urgência…">
+        </div>
+        <div class="campo-grupo">
+          <label for="m-motivo">Motivo do acionamento <span class="req">*</span></label>
+          <select id="m-motivo">
+            <option value="">Selecione…</option>
+            <option>Doença/Atestado Médico</option>
+            <option>Internamento hospitalar</option>
+            <option>Cirurgia não estética</option>
+            <option>Licença-maternidade</option>
+            <option>Licença-paternidade</option>
+            <option>Doença grave de familiar</option>
+            <option>Acompanhar cirurgia de familiar</option>
+            <option>Óbito — cônjuge/pai/mãe/filho/irmão</option>
+            <option>Óbito — avô/avó/neto/sogro</option>
+            <option>Casamento do plantonista</option>
+            <option>Episódio social violento (com B.O.)</option>
+            <option>Incompatibilidade — novo concurso</option>
+            <option>Intimação judicial/policial/posse</option>
+            <option>Dobra não coberta pela escala</option>
+            <option>Convocação CA/CF/Comitê de Conformidade</option>
+            <option>Saída definitiva de cooperado</option>
+            <option>Nova vaga contratual</option>
+            <option>Afastamento temporário por saúde</option>
+            <option>Aprimoramento científico (mín. 30 dias)</option>
+            <option>Devolução de plantão voluntário (aviso prévio)</option>
+            <option>Afastamento disciplinar</option>
+            <option>Férias de funcionário do hospital</option>
+          </select>
+          <div class="msg-erro" id="erro-m-motivo">Campo obrigatório.</div>
+        </div>
+        <div class="campo-grupo">
+          <label for="m-reserva-acionado">Reserva acionado <span class="req">*</span></label>
+          <input type="text" id="m-reserva-acionado" placeholder="Nome do plantonista reserva">
+          <div class="msg-erro" id="erro-m-reserva">Campo obrigatório.</div>
+        </div>
+      </div>
+
+      <div class="campo-grupo">
+        <label>Status do acionamento <span class="req">*</span></label>
+        <div class="status-selector">
+          <div class="status-opt confirmado" id="opt-confirmado" onclick="selecionarStatus('confirmado')">
+            ✓ Confirmado
+          </div>
+          <div class="status-opt recusado" id="opt-recusado" onclick="selecionarStatus('recusado')">
+            ✕ Recusado / Não atendido
+          </div>
+        </div>
+        <div class="msg-erro" id="erro-m-status">Selecione o status.</div>
+      </div>
+
+      <div class="campo-grupo">
+        <label for="m-obs">Observações</label>
+        <textarea id="m-obs" placeholder="Detalhes relevantes sobre este acionamento…" rows="2"></textarea>
+      </div>
+
+      <button class="btn-primary" onclick="salvarAcionamento()">
+        Salvar acionamento
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ TELA 3: CONCLUSÃO ════ -->
+<div id="tela-conclusao" class="wrapper">
+  <div class="conclusao-hero">
+    <div class="conclusao-check">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Turno encerrado!</h2>
+    <p>Relatório enviado com sucesso para o sistema.</p>
+  </div>
+
+  <div class="resumo-turno">
+    <div class="resumo-grid">
+      <div class="resumo-stat">
+        <div class="rs-num" id="res-total">0</div>
+        <div class="rs-label">Acionamentos</div>
+      </div>
+      <div class="resumo-stat">
+        <div class="rs-num" id="res-confirmados">0</div>
+        <div class="rs-label">Confirmados</div>
+      </div>
+      <div class="resumo-stat">
+        <div class="rs-num" id="res-recusados">0</div>
+        <div class="rs-label">Recusados</div>
+      </div>
+    </div>
+    <div id="resumo-lista"></div>
+  </div>
+
+  <button class="btn-novo-turno" onclick="reiniciar()">↩ Iniciar novo turno</button>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
+
+// ── Estado global
+let turno         = {};
+let acionamentos  = [];
+let editandoIdx   = -1;
+let statusSel     = "";
+
+// ── Iniciar turno
+function iniciarTurno() {
+  const data     = document.getElementById("data-turno").value;
+  const tipo     = document.getElementById("tipo-turno").value;
+  const coord    = document.getElementById("coord-nome").value.trim();
+  const reservas = document.getElementById("num-reservas").value.trim();
+  let ok = true;
+
+  [["data-turno","erro-data",v=>v!=""],
+   ["tipo-turno","erro-turno",v=>v!=""],
+   ["coord-nome","erro-coord",v=>v.length>2],
+   ["num-reservas","erro-reservas",v=>/^\d+$/.test(v)]
+  ].forEach(([id,errId,chk])=>{
+    const el=document.getElementById(id), er=document.getElementById(errId);
+    if(!chk(el.value)){el.classList.add("erro");er.classList.add("vis");ok=false;}
+    else{el.classList.remove("erro");er.classList.remove("vis");}
+  });
+  if(!ok) return;
+
+  turno = { data: formatarData(data), dataBruta: data, tipo, coord, reservas };
+
+  document.getElementById("ti-titulo").textContent  = tipo;
+  document.getElementById("ti-coord").textContent   = "Coordenador: " + coord;
+  document.getElementById("ti-data").textContent    = formatarData(data);
+  document.getElementById("ti-reservas").textContent= reservas + " reservas escalados";
+
+  const badge = document.getElementById("turno-badge");
+  document.getElementById("badge-txt").textContent = tipo.includes("Diurno") ? "Diurno ativo" : "Noturno ativo";
+  badge.classList.add("vis");
+
+  document.getElementById("tela-inicio").style.display = "none";
+  document.getElementById("tela-turno").classList.add("vis");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// ── Modo: protocolo ou manual
+let modoAtual = "protocolo";
+
+function selecionarModo(modo) {
+  modoAtual = modo;
+  const btnProt = document.getElementById("modo-protocolo-btn");
+  const btnMan  = document.getElementById("modo-manual-btn");
+  const blocoProt = document.getElementById("bloco-protocolo");
+  const blocoMan  = document.getElementById("bloco-aviso-manual");
+
+  if (modo === "protocolo") {
+    btnProt.style.border = "2px solid var(--verde)";
+    btnProt.style.background = "var(--verde-light)";
+    btnProt.querySelector("div:nth-child(2)").style.color = "var(--verde)";
+    btnMan.style.border = "2px solid var(--cinza-2)";
+    btnMan.style.background = "white";
+    btnMan.querySelector("div:nth-child(2)").style.color = "var(--cinza-4)";
+    blocoProt.style.display = "block";
+    blocoMan.style.display  = "none";
+  } else {
+    btnMan.style.border = "2px solid var(--info)";
+    btnMan.style.background = "var(--info-bg)";
+    btnMan.querySelector("div:nth-child(2)").style.color = "var(--info)";
+    btnProt.style.border = "2px solid var(--cinza-2)";
+    btnProt.style.background = "white";
+    btnProt.querySelector("div:nth-child(2)").style.color = "var(--cinza-4)";
+    blocoProt.style.display = "none";
+    blocoMan.style.display  = "block";
+    document.getElementById("modal-protocolo").value = "";
+    document.getElementById("alerta-vinculo").classList.remove("vis");
+  }
+}
+
+// ── Modal
+function abrirModal(idx = -1) {
+  editandoIdx = idx;
+  statusSel   = "";
+  modoAtual   = "protocolo";
+  selecionarModo("protocolo");
+  document.getElementById("opt-confirmado").classList.remove("sel");
+  document.getElementById("opt-recusado").classList.remove("sel");
+
+  if (idx >= 0) {
+    const a = acionamentos[idx];
+    document.getElementById("modal-titulo").textContent = "Editar acionamento";
+    document.getElementById("modal-protocolo").value      = a.protocolo || "";
+    document.getElementById("m-plantonista-saiu").value   = a.plantonistaSaiu;
+    document.getElementById("m-ano-coop").value           = a.anoCoop || "";
+    document.getElementById("m-hospital").value           = a.hospital;
+    document.getElementById("m-setor").value              = a.setor || "";
+    document.getElementById("m-motivo").value             = a.motivo;
+    document.getElementById("m-reserva-acionado").value   = a.reservaAcionado;
+    document.getElementById("m-obs").value                = a.obs || "";
+    statusSel = a.status;
+    document.getElementById("opt-" + a.status).classList.add("sel");
+    if (a.protocolo) mostrarVinculo(a);
+    if (a.tipo === "manual") selecionarModo("manual");
+  } else {
+    document.getElementById("modal-titulo").textContent = "Novo acionamento";
+    document.getElementById("modal-protocolo").value      = "";
+    document.getElementById("m-plantonista-saiu").value   = "";
+    document.getElementById("m-ano-coop").value           = "";
+    document.getElementById("m-hospital").value           = "";
+    document.getElementById("m-setor").value              = "";
+    document.getElementById("m-motivo").value             = "";
+    document.getElementById("m-reserva-acionado").value   = "";
+    document.getElementById("m-obs").value                = "";
+    document.getElementById("alerta-vinculo").classList.remove("vis");
+  }
+
+  document.getElementById("modal-overlay").classList.add("vis");
+  document.body.style.overflow = "hidden";
+}
+
+function fecharModal() {
+  document.getElementById("modal-overlay").classList.remove("vis");
+  document.body.style.overflow = "";
+}
+function fecharModalFora(e) {
+  if (e.target === document.getElementById("modal-overlay")) fecharModal();
+}
+
+// ── Buscar protocolo
+async function buscarProtocolo() {
+  const prot = document.getElementById("modal-protocolo").value.trim().toUpperCase();
+  if (!/^AC-\d{8}-\d{6}$/.test(prot)) {
+    alert("Formato inválido. Use: AC-AAAAMMDD-HHMMSS"); return;
+  }
+
+  // Verifica se já foi adicionado
+  const jaExiste = acionamentos.find(a => a.protocolo === prot && editandoIdx === -1);
+  if (jaExiste) { alert("Este protocolo já foi adicionado ao turno."); return; }
+
+  if (APPS_SCRIPT_URL === "COLE_AQUI_A_URL_DO_WEB_APP") {
+    // Modo demo
+    document.getElementById("m-plantonista-saiu").value = "Plantonista Demo";
+    document.getElementById("m-hospital").value         = "Hospital da Restauração — Urgência (HR)";
+    document.getElementById("m-motivo").value           = "Doença/Atestado Médico";
+    mostrarVinculo({ protocolo: prot, plantonistaSaiu: "Plantonista Demo", hospital: "HR", motivo: "Doença/Atestado Médico" });
+    return;
+  }
+
+  try {
+    const url  = APPS_SCRIPT_URL + "?action=buscarProtocolo&protocolo=" + encodeURIComponent(prot);
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (json.encontrado) {
+      const d = json.dados;
+      document.getElementById("m-plantonista-saiu").value = d.nome;
+      document.getElementById("m-hospital").value         = d.hospital;
+      document.getElementById("m-motivo").value           = d.motivo;
+      mostrarVinculo({ protocolo: prot, plantonistaSaiu: d.nome, hospital: d.hospital, motivo: d.motivo });
+    } else {
+      alert("Protocolo não encontrado. Você pode preencher manualmente.");
+    }
+  } catch(err) {
+    alert("Erro de conexão. Preencha manualmente.");
+  }
+}
+
+function mostrarVinculo(a) {
+  document.getElementById("vinculo-info").textContent =
+    a.plantonistaSaiu + " · " + a.hospital + (a.motivo ? " · " + a.motivo : "");
+  document.getElementById("alerta-vinculo").classList.add("vis");
+}
+
+// ── Status
+function selecionarStatus(s) {
+  statusSel = s;
+  document.getElementById("opt-confirmado").classList.toggle("sel", s === "confirmado");
+  document.getElementById("opt-recusado").classList.toggle("sel", s === "recusado");
+  document.getElementById("erro-m-status").classList.remove("vis");
+}
+
+// ── Salvar acionamento
+function salvarAcionamento() {
+  const campos = [
+    ["m-plantonista-saiu","erro-m-saiu",  v=>v.trim().length>1],
+    ["m-hospital",         "erro-m-hospital",v=>v!=""],
+    ["m-motivo",           "erro-m-motivo",  v=>v!=""],
+    ["m-reserva-acionado", "erro-m-reserva", v=>v.trim().length>1],
+  ];
+  let ok = true;
+  campos.forEach(([id,errId,chk])=>{
+    const el=document.getElementById(id), er=document.getElementById(errId);
+    if(!chk(el.value)){el.classList.add("erro");er.classList.add("vis");ok=false;}
+    else{el.classList.remove("erro");er.classList.remove("vis");}
+  });
+  if(!statusSel){document.getElementById("erro-m-status").classList.add("vis");ok=false;}
+  if(!ok) return;
+
+  const acion = {
+    protocolo:       modoAtual === "protocolo" ? (document.getElementById("modal-protocolo").value.trim().toUpperCase() || null) : null,
+    plantonistaSaiu: document.getElementById("m-plantonista-saiu").value.trim(),
+    anoCoop:         document.getElementById("m-ano-coop").value,
+    hospital:        document.getElementById("m-hospital").value,
+    setor:           document.getElementById("m-setor").value.trim(),
+    motivo:          document.getElementById("m-motivo").value,
+    reservaAcionado: document.getElementById("m-reserva-acionado").value.trim(),
+    status:          statusSel,
+    obs:             document.getElementById("m-obs").value.trim(),
+    tipo:            modoAtual === "protocolo" && document.getElementById("modal-protocolo").value.trim() ? "formulario" : "manual",
+    horario:         horaAtual()
+  };
+
+  if (editandoIdx >= 0) {
+    acionamentos[editandoIdx] = acion;
+  } else {
+    acionamentos.push(acion);
+  }
+
+  renderizarLista();
+  fecharModal();
+}
+
+// ── Renderizar lista
+function renderizarLista() {
+  const lista = document.getElementById("lista-acionamentos");
+  const n     = acionamentos.length;
+
+  document.getElementById("contador-num").textContent = n;
+  document.getElementById("contador-label-txt").textContent =
+    n === 0 ? "Nenhum acionamento registrado"
+    : n === 1 ? "1 acionamento registrado"
+    : n + " acionamentos registrados";
+
+  if (n === 0) { lista.innerHTML = ""; return; }
+
+  lista.innerHTML = acionamentos.map((a, i) => `
+    <div class="item-acionamento">
+      <div class="item-header">
+        <div class="item-num ${a.tipo === 'formulario' ? 'formulario' : 'manual'}">${i+1}</div>
+        <div class="item-titulo">
+          <strong>${a.plantonistaSaiu}</strong>
+          <span>${a.hospital}</span>
+        </div>
+        <span class="item-tag ${a.tipo === 'formulario' ? 'form' : 'man'}">
+          ${a.tipo === 'formulario' ? 'Formulário' : 'Manual'}
+        </span>
+        <span class="item-tag ${a.status === 'confirmado' ? 'conf' : 'recus'}">
+          ${a.status === 'confirmado' ? '✓ Confirmado' : '✕ Recusado'}
+        </span>
+      </div>
+      <div class="item-body">
+        <div class="item-grid">
+          <div class="item-campo"><div class="ic-label">Reserva acionado</div><div class="ic-valor">${a.reservaAcionado}</div></div>
+          <div class="item-campo"><div class="ic-label">Motivo</div><div class="ic-valor">${a.motivo}</div></div>
+          ${a.setor ? `<div class="item-campo"><div class="ic-label">Setor</div><div class="ic-valor">${a.setor}</div></div>` : ""}
+          ${a.anoCoop ? `<div class="item-campo"><div class="ic-label">Ano coop.</div><div class="ic-valor">${a.anoCoop}</div></div>` : ""}
+          ${a.protocolo ? `<div class="item-campo"><div class="ic-label">Protocolo</div><div class="ic-valor" style="font-size:12px;letter-spacing:.5px;color:var(--verde)">${a.protocolo}</div></div>` : ""}
+          <div class="item-campo"><div class="ic-label">Horário</div><div class="ic-valor">${a.horario}</div></div>
+          ${a.obs ? `<div class="item-campo" style="grid-column:1/-1"><div class="ic-label">Observações</div><div class="ic-valor">${a.obs}</div></div>` : ""}
+        </div>
+      </div>
+      <div class="item-acoes">
+        <button class="btn-sm btn-editar"  onclick="abrirModal(${i})">Editar</button>
+        <button class="btn-sm btn-excluir" onclick="excluirAcionamento(${i})">Excluir</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function excluirAcionamento(idx) {
+  if (!confirm("Excluir este acionamento?")) return;
+  acionamentos.splice(idx, 1);
+  renderizarLista();
+}
+
+// ── Concluir turno
+async function concluirTurno() {
+  if (acionamentos.length === 0) {
+    if (!confirm("Nenhum acionamento registrado. Deseja concluir assim mesmo?")) return;
+  }
+
+  const btn = document.getElementById("btn-concluir");
+  btn.classList.add("loading"); btn.disabled = true;
+
+  const pad = x => String(x).padStart(2,"0");
+  const agora = new Date();
+  const dataHoraFecho = `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} às ${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+
+  const payload = {
+    action:        "registrarTurno",
+    turno,
+    acionamentos,
+    obsTurno:      document.getElementById("obs-turno-geral").value.trim(),
+    dataHoraFecho,
+    totalAcionamentos:  acionamentos.length,
+    totalConfirmados:   acionamentos.filter(a=>a.status==="confirmado").length,
+    totalRecusados:     acionamentos.filter(a=>a.status==="recusado").length,
+    totalFormulario:    acionamentos.filter(a=>a.tipo==="formulario").length,
+    totalManual:        acionamentos.filter(a=>a.tipo==="manual").length,
+  };
+
+  try {
+    if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST", body: JSON.stringify(payload),
+        headers: {"Content-Type":"application/json"}
+      });
+    }
+  } catch(err) { console.warn("Apps Script indisponível:", err); }
+
+  // Tela de conclusão
+  document.getElementById("res-total").textContent      = payload.totalAcionamentos;
+  document.getElementById("res-confirmados").textContent= payload.totalConfirmados;
+  document.getElementById("res-recusados").textContent  = payload.totalRecusados;
+
+  document.getElementById("resumo-lista").innerHTML = acionamentos.length
+    ? `<div style="font-size:13px; border-top:1px solid var(--cinza-1); padding-top:14px; margin-top:4px;">` +
+      acionamentos.map((a,i) =>
+        `<div style="padding:8px 0; border-bottom:1px solid var(--cinza-1); display:flex; gap:10px; align-items:center;">
+          <span style="background:${a.status==='confirmado'?'#dcfce7':'#fef2f2'};color:${a.status==='confirmado'?'#166534':'var(--erro)'};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;">${a.status==='confirmado'?'✓':'✕'}</span>
+          <div style="flex:1"><strong>${a.plantonistaSaiu}</strong> → ${a.reservaAcionado}<br><span style="color:var(--cinza-4);font-size:12px;">${a.hospital} · ${a.motivo}</span></div>
+        </div>`
+      ).join("") + `</div>`
+    : "";
+
+  document.getElementById("tela-turno").classList.remove("vis");
+  document.getElementById("tela-conclusao").classList.add("vis");
+  document.getElementById("turno-badge").classList.remove("vis");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ── Reiniciar
+function reiniciar() {
+  turno = {}; acionamentos = []; editandoIdx = -1;
+  document.getElementById("tela-conclusao").classList.remove("vis");
+  document.getElementById("tela-turno").classList.remove("vis");
+  document.getElementById("tela-inicio").style.display = "block";
+  document.getElementById("data-turno").value = "";
+  document.getElementById("tipo-turno").value = "";
+  document.getElementById("coord-nome").value = "";
+  document.getElementById("num-reservas").value = "";
+  document.getElementById("obs-turno-geral").value = "";
+  document.getElementById("lista-acionamentos").innerHTML = "";
+  document.getElementById("contador-num").textContent = "0";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ── Auxiliares
+function formatarData(str) {
+  if (!str) return "—";
+  const [y,m,d] = str.split("-");
+  return `${d}/${m}/${y}`;
+}
+function horaAtual() {
+  const n = new Date();
+  const p = x => String(x).padStart(2,"0");
+  return `${p(n.getHours())}:${p(n.getMinutes())}`;
+}
+
+// Define data padrão como hoje
+document.getElementById("data-turno").valueAsDate = new Date();
+</script>
+</body>
+</html>
