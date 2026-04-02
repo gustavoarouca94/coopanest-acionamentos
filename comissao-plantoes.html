@@ -361,6 +361,10 @@ body {
     <div class="tab" id="tab-historico" onclick="mudarTab('historico')">
       Histórico completo
     </div>
+    <div class="tab" id="tab-avisos" onclick="mudarTab('avisos')">
+      Avisos Prévios
+      <span class="badge-tab" id="badge-avisos">0</span>
+    </div>
   </div>
 </div>
 
@@ -440,11 +444,44 @@ body {
   </div>
 </div>
 
+<!-- ════ TELA: AVISOS PRÉVIOS ════ -->
+<div id="tela-avisos" class="tela wrapper">
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;" id="ap-stats-bar">
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--erro);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--erro);" id="ap-st-critico">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Vence em ≤ 7 dias</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--alerta);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--alerta);" id="ap-st-urgente">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Vence em 8–15 dias</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--amarelo);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--amarelo);" id="ap-st-atencao">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Vence em 16–30 dias</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--verde);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--verde);" id="ap-st-normal">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Mais de 30 dias</div>
+    </div>
+  </div>
+
+  <div class="filtros-bar" style="margin-bottom:14px;">
+    <button class="filtro-btn ativo" onclick="apSetFiltro('todos',this)">Todos ativos</button>
+    <button class="filtro-btn" onclick="apSetFiltro('critico',this)">≤ 7 dias</button>
+    <button class="filtro-btn" onclick="apSetFiltro('urgente',this)">8–15 dias</button>
+    <button class="filtro-btn" onclick="apSetFiltro('encerrado',this)">Encerrados</button>
+    <input class="busca-input" id="ap-busca" placeholder="Buscar plantonista ou hospital…" oninput="apRender()">
+  </div>
+
+  <div id="ap-lista"></div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
+const APPS_SCRIPT_URL = "COLE_AQUI_A_URL_DO_WEB_APP";
 
 // ── Dados simulados (substituídos pelo Apps Script em produção)
 let acionamentos = [
@@ -792,6 +829,7 @@ function mudarTab(tab) {
   document.querySelectorAll(".tela").forEach(t => t.classList.remove("vis"));
   document.getElementById("tab-" + tab).classList.add("ativa");
   document.getElementById("tela-" + tab).classList.add("vis");
+  if (tab === "avisos") apRender();
 }
 
 function atualizarBadge() {
@@ -802,7 +840,170 @@ function atualizarBadge() {
   const badge = document.getElementById("badge-pendencias");
   badge.textContent = n;
   badge.classList.toggle("vis", n > 0);
+
+  // Badge de avisos prévios urgentes
+  const nAP = avisosPrevios.filter(a => a.status === "Ativo" && apDiasRest(a) <= 15 && apDiasRest(a) >= 0).length;
+  const badgeAP = document.getElementById("badge-avisos");
+  badgeAP.textContent = nAP;
+  badgeAP.classList.toggle("vis", nAP > 0);
 }
+
+// ════ AVISOS PRÉVIOS ════
+let avisosPrevios = [
+  { protocolo:"AP-20260115-091200", nome:"Rodrigo Salzano", crm:"CRM-PE 18234",
+    hospital:"Hospital da Restauração — Urgência (HR)", turno:"Noturno (19h–07h)",
+    diasSemana:"Segunda e Quarta", dataInicio:"15/01/2026", prazoDias:90,
+    dataVencimento:"15/04/2026", dataVencISO: new Date(Date.now()+5*86400000).toISOString(),
+    motivoSaida:"Assumiu concurso público", status:"Ativo" },
+  { protocolo:"AP-20260201-143000", nome:"Ana Clara", crm:"CRM-PE 22341",
+    hospital:"Hospital Miguel Arraes (HMA)", turno:"Diurno (07h–19h)",
+    diasSemana:"Terça e Quinta", dataInicio:"01/02/2026", prazoDias:90,
+    dataVencimento:"02/05/2026", dataVencISO: new Date(Date.now()+12*86400000).toISOString(),
+    motivoSaida:"Outro serviço / clínica", status:"Ativo" },
+  { protocolo:"AP-20260210-080000", nome:"Marcelo Banja", crm:"CRM-PE 31122",
+    hospital:"Maternidade CISAM", turno:"Noturno (19h–07h)",
+    diasSemana:"Sábado", dataInicio:"10/02/2026", prazoDias:180,
+    dataVencimento:"09/08/2026", dataVencISO: new Date(Date.now()+25*86400000).toISOString(),
+    motivoSaida:"Sobrecarga / questões pessoais", status:"Ativo" },
+  { protocolo:"AP-20260101-100000", nome:"Larissa Tavares", crm:"CRM-PE 19876",
+    hospital:"IMIP Maternidade", turno:"Diurno (07h–19h)",
+    diasSemana:"Sexta", dataInicio:"01/01/2026", prazoDias:90,
+    dataVencimento:"01/04/2026", dataVencISO: new Date(Date.now()+55*86400000).toISOString(),
+    motivoSaida:"Mudança de cidade", status:"Ativo" },
+];
+
+let apFiltro = "todos";
+
+function apDiasRest(ap) {
+  return Math.ceil((new Date(ap.dataVencISO) - new Date()) / 86400000);
+}
+
+function apUrgencia(ap) {
+  if (ap.status !== "Ativo") return "encerrado";
+  const d = apDiasRest(ap);
+  if (d <= 0)  return "vencido";
+  if (d <= 7)  return "critico";
+  if (d <= 15) return "urgente";
+  if (d <= 30) return "atencao";
+  return "normal";
+}
+
+function apSetFiltro(f, el) {
+  apFiltro = f;
+  document.querySelectorAll("#tela-avisos .filtro-btn").forEach(b => b.classList.remove("ativo"));
+  el.classList.add("ativo");
+  apRender();
+}
+
+function apRender() {
+  // Stats
+  const ativos = avisosPrevios.filter(a => a.status === "Ativo");
+  document.getElementById("ap-st-critico").textContent = ativos.filter(a => { const d=apDiasRest(a); return d>=0&&d<=7; }).length;
+  document.getElementById("ap-st-urgente").textContent = ativos.filter(a => { const d=apDiasRest(a); return d>=8&&d<=15; }).length;
+  document.getElementById("ap-st-atencao").textContent = ativos.filter(a => { const d=apDiasRest(a); return d>=16&&d<=30; }).length;
+  document.getElementById("ap-st-normal").textContent  = ativos.filter(a => apDiasRest(a)>30).length;
+
+  let itens = [...avisosPrevios];
+  if (apFiltro === "critico")  itens = itens.filter(a => a.status==="Ativo" && apDiasRest(a)<=7 && apDiasRest(a)>=0);
+  else if (apFiltro === "urgente") itens = itens.filter(a => a.status==="Ativo" && apDiasRest(a)<=15 && apDiasRest(a)>=8);
+  else if (apFiltro === "encerrado") itens = itens.filter(a => a.status !== "Ativo");
+  else itens = itens.filter(a => a.status === "Ativo");
+
+  const busca = document.getElementById("ap-busca").value.toLowerCase();
+  if (busca) itens = itens.filter(a =>
+    a.nome.toLowerCase().includes(busca) || a.hospital.toLowerCase().includes(busca)
+  );
+
+  itens.sort((a,b) => apDiasRest(a) - apDiasRest(b));
+
+  const lista = document.getElementById("ap-lista");
+  if (!itens.length) {
+    lista.innerHTML = `<div style="text-align:center;padding:32px;color:var(--cinza-4);">
+      <div style="font-size:28px;margin-bottom:8px;">✅</div>
+      <strong style="color:var(--texto);">Nenhum aviso prévio neste filtro</strong>
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = itens.map(ap => {
+    const urg  = apUrgencia(ap);
+    const dias = apDiasRest(ap);
+    const corBorda = urg==="critico"||urg==="vencido" ? "var(--erro)" : urg==="urgente" ? "var(--alerta)" : urg==="atencao" ? "#eab308" : urg==="encerrado" ? "var(--cinza-2)" : "var(--verde)";
+    const tagCor   = urg==="critico"||urg==="vencido" ? "background:var(--erro-bg);color:var(--erro)" : urg==="urgente" ? "background:var(--alerta-bg);color:var(--alerta)" : urg==="atencao" ? "background:var(--amarelo-bg);color:var(--amarelo)" : urg==="encerrado" ? "background:var(--cinza-1);color:var(--cinza-4)" : "background:var(--verde-light);color:var(--verde)";
+    const tagTxt   = dias<=0 ? "Vencido" : dias<=7 ? `${dias}d — crítico` : dias<=15 ? `${dias}d — urgente` : dias<=30 ? `${dias}d — atenção` : urg==="encerrado" ? "Encerrado" : `${dias}d restantes`;
+    const progPct  = Math.max(0,Math.min(100,Math.round((1-dias/ap.prazoDias)*100)));
+    const progCor  = urg==="critico"||urg==="vencido" ? "var(--erro)" : urg==="urgente" ? "var(--alerta)" : urg==="atencao" ? "#eab308" : "var(--verde)";
+
+    return `<div class="acion-card" style="border-left:4px solid ${corBorda};margin-bottom:10px;">
+      <div class="acion-header">
+        <div class="acion-avatar" style="background:${urg==="critico"||urg==="vencido"?"var(--erro-bg)":urg==="urgente"?"var(--alerta-bg)":urg==="encerrado"?"var(--cinza-1)":"var(--verde-light)"};color:${urg==="critico"||urg==="vencido"?"var(--erro)":urg==="urgente"?"var(--alerta)":urg==="encerrado"?"var(--cinza-4)":"var(--verde)"};">${ap.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</div>
+        <div class="acion-info">
+          <div class="acion-nome">${ap.nome} <span style="font-weight:400;font-size:12px;color:var(--cinza-4);">${ap.crm}</span></div>
+          <div class="acion-sub">${ap.hospital} · ${ap.turno} · ${ap.diasSemana}</div>
+          <div class="acion-tags">
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">⏱ ${tagTxt}</span>
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">${ap.prazoDias}d · Vence ${ap.dataVencimento}</span>
+            ${ap.motivoSaida ? `<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">${ap.motivoSaida}</span>` : ""}
+          </div>
+        </div>
+      </div>
+      ${ap.status==="Ativo" ? `
+      <div style="padding:8px 16px;border-top:1px solid var(--cinza-1);">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--cinza-4);margin-bottom:4px;">
+          <span>Progresso do prazo</span>
+          <strong style="color:var(--texto);">${progPct}% decorrido${dias>0?" — "+dias+"d restantes":" — VENCIDO"}</strong>
+        </div>
+        <div style="height:5px;background:var(--cinza-1);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;border-radius:3px;background:${progCor};width:${progPct}%;transition:width .8s ease;"></div>
+        </div>
+      </div>` : ""}
+      <div class="acion-acoes">
+        ${ap.status==="Ativo" ? `
+        <button class="btn-acao btn-confirmar-atestado" onclick="apEncerrar('${ap.protocolo}')">✓ Voluntário assumiu</button>
+        <button class="btn-acao" style="background:var(--info-bg);color:var(--info);" onclick="apReserva('${ap.protocolo}')">⚡ Cobrir com reserva</button>` : ""}
+        <span style="margin-left:auto;font-size:11px;color:var(--cinza-4);font-family:monospace;">${ap.protocolo}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function apEncerrar(protocolo) {
+  const ap = avisosPrevios.find(x => x.protocolo === protocolo);
+  if (!ap) return;
+  const vol = prompt("Nome do novo voluntário que assumiu (deixe em branco se não souber):");
+  if (vol === null) return; // cancelou
+  ap.status = "Encerrado — voluntário assumiu" + (vol.trim() ? " (" + vol.trim() + ")" : "");
+  enviarAcao({ action: "encerrarAvisoPrevio", protocolo, novoVoluntario: vol.trim() });
+  atualizarBadge();
+  apRender();
+  mostrarToast("✓ Aviso prévio encerrado para " + ap.nome);
+}
+
+function apReserva(protocolo) {
+  const ap = avisosPrevios.find(x => x.protocolo === protocolo);
+  if (!ap) return;
+  if (!confirm(`Confirmar que a vaga de ${ap.nome} em ${ap.hospital} passará a ser coberta pelo reserva?`)) return;
+  ap.status = "Encerrado — vaga coberta por reserva";
+  enviarAcao({ action: "encerrarAvisoPrevioReserva", protocolo });
+  atualizarBadge();
+  apRender();
+  mostrarToast("⚡ Vaga de " + ap.nome + " marcada para cobertura por reserva");
+}
+
+// Carrega avisos prévios junto com os demais dados
+const _carregarDadosOriginal = carregarDados;
+carregarDados = async function() {
+  await _carregarDadosOriginal();
+  if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+    try {
+      const url  = APPS_SCRIPT_URL + "?action=listarAvisosPrevios";
+      const resp = await fetch(url);
+      const json = await resp.json();
+      if (json.ok && json.dados.length) avisosPrevios = json.dados;
+    } catch(e) { console.warn("Usando avisos demo"); }
+  }
+  atualizarBadge();
+};
 
 // ── Helpers
 function isPendAtestado(a) {

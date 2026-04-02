@@ -406,6 +406,49 @@ tbody tr:hover td { background: var(--surface2); }
     </div>
   </div>
 
+  <!-- Avisos Prévios — Voluntários -->
+  <div class="tabela-card" style="margin-bottom:14px;">
+    <div class="tabela-header">
+      <h3>Avisos prévios de saída — Voluntários</h3>
+      <span id="ap-dash-count" style="font-size:12px;color:var(--text-sec);">—</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 16px;border-bottom:1px solid var(--borda);">
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;border-top:2px solid var(--erro);">
+        <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--erro);" id="ap-kpi-critico">0</div>
+        <div style="font-size:11px;color:var(--text-sec);">≤ 7 dias</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;border-top:2px solid #f59e0b;">
+        <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#f59e0b;" id="ap-kpi-urgente">0</div>
+        <div style="font-size:11px;color:var(--text-sec);">8–15 dias</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;border-top:2px solid #a78bfa;">
+        <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#a78bfa;" id="ap-kpi-atencao">0</div>
+        <div style="font-size:11px;color:var(--text-sec);">16–30 dias</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:12px;border-top:2px solid var(--verde);">
+        <div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--verde);" id="ap-kpi-normal">0</div>
+        <div style="font-size:11px;color:var(--text-sec);">Mais de 30 dias</div>
+      </div>
+    </div>
+    <div class="overflow-x">
+      <table>
+        <thead>
+          <tr>
+            <th>Plantonista</th>
+            <th>Hospital / Turno</th>
+            <th>Dias da semana</th>
+            <th>D0</th>
+            <th>Prazo</th>
+            <th>Vencimento</th>
+            <th>Restam</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="ap-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Tabela de acionamentos recentes -->
   <div class="tabela-card">
     <div class="tabela-header">
@@ -434,7 +477,7 @@ tbody tr:hover td { background: var(--surface2); }
 </div><!-- /main -->
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
+const APPS_SCRIPT_URL = "COLE_AQUI_A_URL_DO_WEB_APP";
 
 // ── Dados demo robustos
 const DEMO = gerarDemoData();
@@ -497,6 +540,26 @@ function filtrarPeriodo(itens) {
   return itens.filter(a => a.dataBruta >= corte);
 }
 
+// ── Avisos prévios — dados demo
+let avisosPreviosDash = [
+  { protocolo:"AP-20260115-091200", nome:"Rodrigo Salzano",
+    hospital:"HR Urgência", turno:"Noturno", diasSemana:"Seg e Qua",
+    dataInicio:"15/01/2026", prazoDias:90, dataVencimento:"15/04/2026",
+    dataVencISO: new Date(Date.now()+5*86400000).toISOString(), status:"Ativo" },
+  { protocolo:"AP-20260201-143000", nome:"Ana Clara",
+    hospital:"HMA", turno:"Diurno", diasSemana:"Ter e Qui",
+    dataInicio:"01/02/2026", prazoDias:90, dataVencimento:"02/05/2026",
+    dataVencISO: new Date(Date.now()+12*86400000).toISOString(), status:"Ativo" },
+  { protocolo:"AP-20260210-080000", nome:"Marcelo Banja",
+    hospital:"CISAM", turno:"Noturno", diasSemana:"Sábado",
+    dataInicio:"10/02/2026", prazoDias:180, dataVencimento:"09/08/2026",
+    dataVencISO: new Date(Date.now()+25*86400000).toISOString(), status:"Ativo" },
+  { protocolo:"AP-20260101-100000", nome:"Larissa Tavares",
+    hospital:"IMIP Maternidade", turno:"Diurno", diasSemana:"Sexta",
+    dataInicio:"01/01/2026", prazoDias:90, dataVencimento:"01/04/2026",
+    dataVencISO: new Date(Date.now()+55*86400000).toISOString(), status:"Ativo" },
+];
+
 // ── Carregar dados
 async function carregarDados() {
   if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
@@ -512,6 +575,13 @@ async function carregarDados() {
         }));
       }
     } catch(e) { console.warn("Usando dados demo:", e); }
+
+    try {
+      const url2  = APPS_SCRIPT_URL + "?action=listarAvisosPrevios";
+      const resp2 = await fetch(url2);
+      const json2 = await resp2.json();
+      if (json2.ok && json2.dados.length > 0) avisosPreviosDash = json2.dados;
+    } catch(e) { console.warn("Usando avisos demo"); }
   }
   renderTudo();
   document.getElementById("ultima-att").textContent = "Atualizado " + horaAtual();
@@ -531,6 +601,7 @@ function renderTudo() {
   renderChartTurnos(itens);
   renderRanking(itens);
   renderAlertas(itens);
+  renderAvisosPrevios();
   renderChartTaxas(itens);
   renderTrends(itens);
   renderTabela(itens);
@@ -718,6 +789,49 @@ function renderTrends(itens) {
       <div class="trend-val" style="color:${cores[cat]||"#2dd87a"}">${n}</div>
     </div>
   `).join("");
+}
+
+
+// ── Avisos Prévios
+function renderAvisosPrevios() {
+  const ativos = avisosPreviosDash.filter(a => a.status === "Ativo");
+  const diasRest = a => Math.ceil((new Date(a.dataVencISO) - new Date()) / 86400000);
+
+  document.getElementById("ap-kpi-critico").textContent = ativos.filter(a => { const d=diasRest(a); return d>=0&&d<=7; }).length;
+  document.getElementById("ap-kpi-urgente").textContent = ativos.filter(a => { const d=diasRest(a); return d>=8&&d<=15; }).length;
+  document.getElementById("ap-kpi-atencao").textContent = ativos.filter(a => { const d=diasRest(a); return d>=16&&d<=30; }).length;
+  document.getElementById("ap-kpi-normal").textContent  = ativos.filter(a => diasRest(a)>30).length;
+
+  const todos = [...avisosPreviosDash].sort((a,b) => diasRest(a) - diasRest(b));
+  document.getElementById("ap-dash-count").textContent = `${ativos.length} ativo(s) · ${avisosPreviosDash.length} total`;
+
+  const tbody = document.getElementById("ap-tbody");
+  if (!todos.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:rgba(240,247,243,.4);padding:24px;">Nenhum aviso prévio registrado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = todos.map(a => {
+    const d = diasRest(a);
+    const pillStyle = a.status !== "Ativo"
+      ? "background:rgba(255,255,255,.06);color:rgba(240,247,243,.4)"
+      : d<=7  ? "background:rgba(248,113,113,.15);color:#f87171"
+      : d<=15 ? "background:rgba(245,158,11,.15);color:#f59e0b"
+      : d<=30 ? "background:rgba(167,139,250,.15);color:#a78bfa"
+      : "background:rgba(45,216,122,.1);color:#2dd87a";
+    const pillTxt = a.status !== "Ativo" ? "Encerrado"
+      : d<=0 ? "Vencido" : d<=7 ? `${d}d — crítico` : d<=15 ? `${d}d — urgente` : d<=30 ? `${d}d — atenção` : `${d}d`;
+    return `<tr>
+      <td style="font-weight:500">${a.nome}</td>
+      <td style="font-size:12px">${a.hospital}<br><span style="color:rgba(240,247,243,.45)">${a.turno}</span></td>
+      <td style="font-size:12px">${a.diasSemana}</td>
+      <td style="font-size:12px">${a.dataInicio}</td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.08);color:rgba(240,247,243,.6);">${a.prazoDias}d</span></td>
+      <td style="font-size:12px">${a.dataVencimento}</td>
+      <td><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${pillStyle}">${pillTxt}</span></td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:rgba(240,247,243,.5);">${a.status==="Ativo"?"Ativo":"Enc."}</span></td>
+    </tr>`;
+  }).join("");
 }
 
 // ── Tabela recentes

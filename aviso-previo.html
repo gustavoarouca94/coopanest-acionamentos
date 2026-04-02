@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a5c3a">
+<title>COOPANEST-PE — Aviso Prévio de Saída</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --verde:       #0a5c3a;
+  --verde-mid:   #0d7a4e;
+  --verde-light: #e8f5ef;
+  --verde-pale:  #f2faf6;
+  --branco:      #ffffff;
+  --cinza-0:     #f7f8f7;
+  --cinza-1:     #ebeeed;
+  --cinza-2:     #d6dbd8;
+  --cinza-3:     #a8b3ae;
+  --cinza-4:     #6b7570;
+  --texto:       #1a2420;
+  --alerta:      #c8530a;
+  --alerta-bg:   #fff4ee;
+  --erro:        #b91c1c;
+  --amarelo:     #92640a;
+  --amarelo-bg:  #fefbea;
+  --r:           10px;
+  --r-lg:        16px;
+  --sombra:      0 2px 12px rgba(10,92,58,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--cinza-0);color:var(--texto);min-height:100vh;font-size:15px;line-height:1.6;}
+
+.header{background:var(--verde);position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.18);}
+.header-inner{max-width:680px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.header-logo{width:48px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.1);border-radius:8px;overflow:hidden;flex-shrink:0;}
+.header-text h1{font-family:'DM Serif Display',serif;font-size:16px;color:white;font-weight:400;line-height:1.2;}
+.header-text p{font-size:11px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.5px;}
+
+.wrapper{max-width:680px;margin:0 auto;padding:24px 16px 60px;}
+
+.aviso-topo{background:var(--amarelo-bg);border-left:3px solid var(--amarelo);border-radius:0 var(--r) var(--r) 0;padding:13px 16px;margin-bottom:22px;font-size:13px;color:#5a3d00;line-height:1.5;}
+.aviso-topo strong{display:block;font-size:14px;margin-bottom:2px;}
+
+.card{background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;margin-bottom:14px;}
+.card-header{background:var(--verde-light);border-bottom:1px solid var(--cinza-1);padding:12px 18px;display:flex;align-items:center;gap:10px;}
+.card-header .num{background:var(--verde);color:white;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.card-header h2{font-size:14px;font-weight:600;color:var(--verde);}
+.card-body{padding:18px;}
+
+.campo-grupo{margin-bottom:16px;}
+.campo-grupo:last-child{margin-bottom:0;}
+.campo-grupo label{display:block;font-size:13px;font-weight:600;color:var(--texto);margin-bottom:5px;}
+.campo-grupo label .req{color:var(--verde-mid);}
+.campo-grupo .hint{font-size:11.5px;color:var(--cinza-4);margin-bottom:5px;line-height:1.4;}
+
+input[type="text"],input[type="email"],input[type="date"],select,textarea{
+  width:100%;padding:10px 13px;border:1.5px solid var(--cinza-1);border-radius:var(--r);
+  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--texto);background:white;
+  transition:border-color .15s,box-shadow .15s;appearance:none;-webkit-appearance:none;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--verde-mid);box-shadow:0 0 0 3px rgba(13,122,78,.1);}
+input.erro,select.erro{border-color:var(--erro);}
+.msg-erro{font-size:12px;color:var(--erro);margin-top:4px;display:none;}
+.msg-erro.vis{display:block;}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7570' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;}
+textarea{resize:vertical;min-height:80px;}
+.dois-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:480px){.dois-col{grid-template-columns:1fr;}}
+
+/* Seletor 90/180 dias */
+.prazo-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+.prazo-opt{border:2px solid var(--cinza-1);border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:all .15s;background:white;}
+.prazo-opt:hover{border-color:var(--cinza-2);}
+.prazo-opt.sel{border-color:var(--verde);background:var(--verde-light);}
+.prazo-opt.sel.urgente{border-color:var(--alerta);background:var(--alerta-bg);}
+.prazo-opt-num{font-family:'DM Serif Display',serif;font-size:28px;color:var(--verde);line-height:1;}
+.prazo-opt.urgente .prazo-opt-num{color:var(--alerta);}
+.prazo-opt-label{font-size:12px;color:var(--cinza-4);margin-top:3px;}
+.prazo-opt-sub{font-size:11px;color:var(--cinza-3);margin-top:2px;}
+
+/* Preview do prazo */
+#preview-prazo{display:none;margin-top:12px;background:var(--verde-pale);border-radius:var(--r);padding:12px 14px;font-size:13px;}
+#preview-prazo.vis{display:block;}
+#preview-prazo .pp-data{font-family:'DM Serif Display',serif;font-size:20px;color:var(--verde);}
+#preview-prazo .pp-dias{font-size:12px;color:var(--cinza-4);}
+
+.btn-submit{width:100%;padding:14px;background:var(--verde);color:white;border:none;border-radius:var(--r-lg);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(10,92,58,.3);display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;}
+.btn-submit:hover{background:var(--verde-mid);}
+.btn-submit:disabled{background:var(--cinza-3);box-shadow:none;cursor:not-allowed;}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+.btn-submit.loading .spinner{display:block;}
+.btn-submit.loading .btn-txt{display:none;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Tela de confirmação */
+#tela-confirmacao{display:none;animation:fadeUp .4s ease both;}
+#tela-confirmacao.vis{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.confirm-hero{background:var(--verde);border-radius:var(--r-lg);padding:28px 24px;text-align:center;color:white;margin-bottom:14px;}
+.confirm-check{width:60px;height:60px;background:rgba(255,255,255,.15);border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;}
+.confirm-check svg{width:30px;height:30px;stroke:white;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+.confirm-hero h2{font-family:'DM Serif Display',serif;font-size:22px;font-weight:400;margin-bottom:6px;}
+.confirm-hero p{font-size:13px;opacity:.85;}
+
+.protocolo-ap{background:var(--verde-light);border:1.5px solid var(--cinza-1);border-radius:var(--r-lg);padding:16px 20px;text-align:center;margin-bottom:14px;}
+.protocolo-ap .label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-4);font-weight:600;}
+.protocolo-ap .num{font-family:'DM Serif Display',serif;font-size:26px;color:var(--verde);letter-spacing:2px;margin:4px 0;}
+.protocolo-ap .sub{font-size:12px;color:var(--cinza-4);}
+
+.resumo-card{background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;margin-bottom:14px;}
+.resumo-header{background:var(--verde-light);padding:12px 16px;border-bottom:1px solid var(--cinza-1);}
+.resumo-header h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--verde);font-weight:700;}
+.resumo-body{padding:16px;}
+.resumo-linha{display:flex;gap:8px;margin-bottom:8px;font-size:13px;}
+.resumo-linha:last-child{margin-bottom:0;}
+.resumo-linha .rl{color:var(--cinza-4);font-size:12px;min-width:130px;flex-shrink:0;}
+.resumo-linha .rv{color:var(--texto);font-weight:500;flex:1;}
+
+.prazo-badge-grande{display:inline-flex;align-items:center;gap:8px;background:var(--alerta-bg);border:1.5px solid var(--alerta);border-radius:var(--r);padding:10px 14px;font-size:13px;color:#7c3200;font-weight:600;margin:10px 0 0;}
+.prazo-badge-grande.ok{background:var(--verde-pale);border-color:var(--verde);color:var(--verde);}
+
+.proximos-passos{background:var(--verde-pale);border-radius:var(--r);padding:14px 16px;font-size:13px;margin-bottom:14px;}
+.proximos-passos strong{display:block;color:var(--verde);font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+.proximos-passos ol{padding-left:18px;line-height:1.8;}
+
+.btn-novo{width:100%;padding:12px;background:var(--cinza-0);color:var(--texto);border:1.5px solid var(--cinza-1);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-novo:hover{background:var(--cinza-1);}
+
+.info-rodape{text-align:center;font-size:12px;color:var(--cinza-4);margin-top:16px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-logo">
+      <svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg" width="48" height="34">
+        <circle cx="6"  cy="32" r="4.5" fill="white" opacity="1"/>
+        <circle cx="6"  cy="22" r="3.5" fill="white" opacity=".85"/>
+        <circle cx="6"  cy="13" r="2.5" fill="white" opacity=".6"/>
+        <circle cx="16" cy="32" r="4.5" fill="white" opacity="1"/>
+        <circle cx="16" cy="22" r="3.5" fill="white" opacity=".85"/>
+        <circle cx="16" cy="13" r="2.5" fill="white" opacity=".6"/>
+        <circle cx="16" cy="6"  r="1.8" fill="white" opacity=".4"/>
+        <circle cx="26" cy="32" r="4.5" fill="white" opacity="1"/>
+        <circle cx="26" cy="22" r="3.5" fill="white" opacity=".85"/>
+        <circle cx="26" cy="13" r="2.5" fill="white" opacity=".6"/>
+        <circle cx="26" cy="6"  r="1.8" fill="white" opacity=".4"/>
+        <circle cx="35" cy="32" r="3"   fill="white" opacity=".9"/>
+        <circle cx="35" cy="22" r="2.5" fill="white" opacity=".7"/>
+        <circle cx="35" cy="13" r="1.8" fill="white" opacity=".45"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <h1>COOPANEST-PE</h1>
+      <p>Aviso Prévio de Saída — Voluntários</p>
+    </div>
+  </div>
+</header>
+
+<!-- TELA 1: FORMULÁRIO -->
+<div id="tela-form" class="wrapper">
+
+  <div class="aviso-topo">
+    <strong>Plantonista voluntário — comunicação de saída</strong>
+    Preencha este formulário para registrar formalmente seu aviso prévio. Ele chegará ao NAC e à Comissão de Plantões automaticamente. O prazo começa a contar a partir da data de início informada.
+  </div>
+
+  <form id="form-aviso" novalidate>
+
+    <!-- SEÇÃO 1: Identificação -->
+    <div class="card">
+      <div class="card-header"><div class="num">1</div><h2>Seus dados</h2></div>
+      <div class="card-body">
+        <div class="campo-grupo">
+          <label for="nome">Nome completo <span class="req">*</span></label>
+          <input type="text" id="nome" placeholder="Seu nome conforme cadastro na COOPANEST" autocomplete="name">
+          <div class="msg-erro" id="erro-nome">Informe seu nome completo.</div>
+        </div>
+        <div class="dois-col">
+          <div class="campo-grupo">
+            <label for="crm">CRM <span class="req">*</span></label>
+            <input type="text" id="crm" placeholder="Ex: 12345" inputmode="numeric" maxlength="10">
+            <div class="msg-erro" id="erro-crm">Informe seu CRM.</div>
+          </div>
+          <div class="campo-grupo">
+            <label for="crm-uf">Estado <span class="req">*</span></label>
+            <select id="crm-uf">
+              <option value="PE" selected>PE</option>
+              <option value="AL">AL</option><option value="AM">AM</option><option value="BA">BA</option>
+              <option value="CE">CE</option><option value="DF">DF</option><option value="GO">GO</option>
+              <option value="MA">MA</option><option value="MG">MG</option><option value="PB">PB</option>
+              <option value="PI">PI</option><option value="PR">PR</option><option value="RJ">RJ</option>
+              <option value="RN">RN</option><option value="RS">RS</option><option value="SC">SC</option>
+              <option value="SE">SE</option><option value="SP">SP</option><option value="TO">TO</option>
+            </select>
+          </div>
+        </div>
+        <div class="campo-grupo">
+          <label for="email">E-mail <span class="req">*</span></label>
+          <div class="hint">Você receberá a confirmação neste endereço</div>
+          <input type="email" id="email" placeholder="seu@email.com" autocomplete="email">
+          <div class="msg-erro" id="erro-email">Informe um e-mail válido.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 2: Plantão -->
+    <div class="card">
+      <div class="card-header"><div class="num">2</div><h2>Plantão a ser deixado</h2></div>
+      <div class="card-body">
+        <div class="campo-grupo">
+          <label for="hospital">Hospital <span class="req">*</span></label>
+          <select id="hospital">
+            <option value="">Selecione o hospital…</option>
+            <option>Hospital da Restauração — Urgência (HR)</option>
+            <option>Hospital da Restauração — Imagem (HR Imagem)</option>
+            <option>Hospital da Restauração — Hemodinâmica</option>
+            <option>Hospital da Restauração — Queimados</option>
+            <option>Hospital da Restauração — Neurocirurgia</option>
+            <option>Hospital Getúlio Vargas (HGV)</option>
+            <option>Hospital Otávio de Freitas — Emergência (HOF)</option>
+            <option>Hospital Otávio de Freitas — SRPA Ortopedia</option>
+            <option>Hospital Pelópidas da Silveira (HPS)</option>
+            <option>Hospital Dom Hélder Câmara (HDH)</option>
+            <option>Hospital Miguel Arraes (HMA)</option>
+            <option>Hospital do Idoso</option>
+            <option>IMIP / Pedro II / Oscar Coutinho — SR e Urgências</option>
+            <option>IMIP Maternidade</option>
+            <option>Maternidade CISAM</option>
+            <option>Hospital Barão de Lucena (HBL)</option>
+            <option>Hospital Agamenon Magalhães (HAM)</option>
+            <option>HAM — Hemodinâmica</option>
+            <option>Hospital Alfa</option>
+            <option>HUOC — SRPA Bloco A</option>
+            <option>HUOC — SRPA Bloco B</option>
+            <option>HUOC — Tomografia</option>
+            <option>HUOC — Braquiterapia</option>
+            <option>PROCAPE</option>
+            <option>HSE (SRPA + Urgências)</option>
+            <option>Outro (especificar nas observações)</option>
+          </select>
+          <div class="msg-erro" id="erro-hospital">Selecione o hospital.</div>
+        </div>
+        <div class="dois-col">
+          <div class="campo-grupo">
+            <label for="setor">Setor / Sala</label>
+            <input type="text" id="setor" placeholder="Ex: UTI, CC, SRPA…">
+          </div>
+          <div class="campo-grupo">
+            <label for="turno">Turno <span class="req">*</span></label>
+            <select id="turno">
+              <option value="">Selecione…</option>
+              <option>Diurno (07h–19h)</option>
+              <option>Noturno (19h–07h)</option>
+            </select>
+            <div class="msg-erro" id="erro-turno">Selecione o turno.</div>
+          </div>
+        </div>
+        <div class="campo-grupo">
+          <label for="dia-semana">Dia(s) da semana do plantão <span class="req">*</span></label>
+          <div class="hint">Informe os dias em que você cobre este plantão</div>
+          <input type="text" id="dia-semana" placeholder="Ex: Segunda e Quarta diurno, Sábado noturno">
+          <div class="msg-erro" id="erro-dia-semana">Informe o(s) dia(s) da semana.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 3: Prazo -->
+    <div class="card">
+      <div class="card-header"><div class="num">3</div><h2>Prazo do aviso prévio</h2></div>
+      <div class="card-body">
+        <div class="campo-grupo">
+          <label for="data-inicio">Data de início do aviso prévio (D0) <span class="req">*</span></label>
+          <div class="hint">Normalmente a data de envio deste formulário. Deve coincidir com a data do e-mail enviado ao NAC.</div>
+          <input type="date" id="data-inicio" onchange="atualizarPreview()">
+          <div class="msg-erro" id="erro-data-inicio">Informe a data de início.</div>
+        </div>
+
+        <div class="campo-grupo">
+          <label>Duração do aviso prévio <span class="req">*</span></label>
+          <div class="hint">90 dias para plantões regulares. 180 dias para plantões em feriados ou datas especiais.</div>
+          <div class="prazo-selector">
+            <div class="prazo-opt" id="opt-90" onclick="selecionarPrazo(90)">
+              <div class="prazo-opt-num">90</div>
+              <div class="prazo-opt-label">dias corridos</div>
+              <div class="prazo-opt-sub">Plantão regular</div>
+            </div>
+            <div class="prazo-opt urgente" id="opt-180" onclick="selecionarPrazo(180)">
+              <div class="prazo-opt-num">180</div>
+              <div class="prazo-opt-label">dias corridos</div>
+              <div class="prazo-opt-sub">Feriado / Data especial</div>
+            </div>
+          </div>
+          <div class="msg-erro" id="erro-prazo">Selecione a duração do aviso prévio.</div>
+        </div>
+
+        <div id="preview-prazo">
+          <div style="font-size:12px;color:var(--cinza-4);margin-bottom:4px;">Data de vencimento calculada</div>
+          <div class="pp-data" id="pp-data-venc">—</div>
+          <div class="pp-dias" id="pp-dias-rest">—</div>
+        </div>
+
+        <div class="campo-grupo" style="margin-top:16px;">
+          <label for="motivo-saida">Motivo da saída</label>
+          <div class="hint">Opcional — ajuda a Comissão no planejamento</div>
+          <select id="motivo-saida">
+            <option value="">Prefiro não informar</option>
+            <option>Assumiu concurso público</option>
+            <option>Sobrecarga / questões pessoais</option>
+            <option>Mudança de cidade</option>
+            <option>Outro serviço / clínica</option>
+            <option>Aposentadoria</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div class="campo-grupo">
+          <label for="obs">Observações</label>
+          <textarea id="obs" placeholder="Informações adicionais relevantes para a Comissão…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-submit" id="btn-enviar">
+      <div class="spinner"></div>
+      <span class="btn-txt">Registrar aviso prévio</span>
+    </button>
+    <div class="info-rodape">
+      Ao enviar, o NAC e a Comissão de Plantões serão notificados automaticamente.<br>
+      Você receberá uma confirmação por e-mail com o número do protocolo.
+    </div>
+  </form>
+</div>
+
+<!-- TELA 2: CONFIRMAÇÃO -->
+<div id="tela-confirmacao" class="wrapper">
+  <div class="confirm-hero">
+    <div class="confirm-check">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Aviso prévio registrado!</h2>
+    <p>O NAC e a Comissão de Plantões foram notificados.</p>
+  </div>
+
+  <div class="protocolo-ap">
+    <div class="label">Protocolo do aviso prévio</div>
+    <div class="num" id="conf-protocolo">—</div>
+    <div class="sub" id="conf-datahora">—</div>
+  </div>
+
+  <div class="resumo-card">
+    <div class="resumo-header"><h3>Resumo do aviso prévio</h3></div>
+    <div class="resumo-body">
+      <div class="resumo-linha"><span class="rl">Plantonista</span><span class="rv" id="res-nome">—</span></div>
+      <div class="resumo-linha"><span class="rl">CRM</span><span class="rv" id="res-crm">—</span></div>
+      <div class="resumo-linha"><span class="rl">Hospital</span><span class="rv" id="res-hospital">—</span></div>
+      <div class="resumo-linha"><span class="rl">Turno</span><span class="rv" id="res-turno">—</span></div>
+      <div class="resumo-linha"><span class="rl">Dias da semana</span><span class="rv" id="res-dias">—</span></div>
+      <div class="resumo-linha"><span class="rl">D0 (início)</span><span class="rv" id="res-d0">—</span></div>
+      <div class="resumo-linha"><span class="rl">Prazo</span><span class="rv" id="res-prazo">—</span></div>
+      <div class="resumo-linha">
+        <span class="rl">Vencimento</span>
+        <span class="rv" id="res-venc">—</span>
+      </div>
+      <div id="res-prazo-badge"></div>
+    </div>
+  </div>
+
+  <div class="proximos-passos">
+    <strong>Próximos passos</strong>
+    <ol id="pp-lista">
+      <li>Guarde o número do protocolo acima</li>
+      <li>O sistema enviará alertas automáticos à Comissão em D-30, D-15 e D-7</li>
+      <li>Se um voluntário assumir antes do vencimento, a Comissão encerrará o aviso prévio no sistema</li>
+      <li>Se vencer sem substituto, a vaga será coberta pelo reserva automaticamente</li>
+    </ol>
+  </div>
+
+  <button class="btn-novo" onclick="reiniciar()">↩ Novo aviso prévio</button>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = "COLE_AQUI_A_URL_DO_WEB_APP";
+let prazoDias = 0;
+
+function selecionarPrazo(dias) {
+  prazoDias = dias;
+  document.getElementById("opt-90").classList.toggle("sel", dias===90);
+  document.getElementById("opt-180").classList.toggle("sel", dias===180);
+  document.getElementById("erro-prazo").classList.remove("vis");
+  atualizarPreview();
+}
+
+function atualizarPreview() {
+  const dataStr = document.getElementById("data-inicio").value;
+  if (!dataStr || !prazoDias) {
+    document.getElementById("preview-prazo").classList.remove("vis");
+    return;
+  }
+  const d0   = new Date(dataStr + "T12:00:00");
+  const venc = new Date(d0);
+  venc.setDate(venc.getDate() + prazoDias);
+
+  const agora      = new Date();
+  const diasRest   = Math.ceil((venc - agora) / 86400000);
+  const vencFmt    = formatarData(venc);
+
+  document.getElementById("pp-data-venc").textContent = vencFmt;
+  document.getElementById("pp-dias-rest").textContent =
+    diasRest > 0 ? diasRest + " dias corridos a partir de hoje" : "Prazo já encerrado";
+  document.getElementById("preview-prazo").classList.add("vis");
+}
+
+function validar() {
+  let ok = true;
+  function chk(id, errId, testFn) {
+    const el = document.getElementById(id);
+    const msg = document.getElementById(errId);
+    if (!el) return;
+    if (!testFn(el.value)) {
+      el.classList.add("erro"); if(msg) msg.classList.add("vis"); ok = false;
+    } else {
+      el.classList.remove("erro"); if(msg) msg.classList.remove("vis");
+    }
+  }
+  chk("nome",        "erro-nome",        v => v.trim().length > 2);
+  chk("crm",         "erro-crm",         v => /^\d{4,10}$/.test(v.trim()));
+  chk("email",       "erro-email",       v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v));
+  chk("hospital",    "erro-hospital",    v => v !== "");
+  chk("turno",       "erro-turno",       v => v !== "");
+  chk("dia-semana",  "erro-dia-semana",  v => v.trim().length > 2);
+  chk("data-inicio", "erro-data-inicio", v => v !== "");
+  if (!prazoDias) {
+    document.getElementById("erro-prazo").classList.add("vis"); ok = false;
+  }
+  return ok;
+}
+
+function formatarData(d) {
+  if (!d) return "—";
+  if (typeof d === "string") {
+    const [y,m,dd] = d.split("-");
+    return `${dd}/${m}/${y}`;
+  }
+  const pad = x => String(x).padStart(2,"0");
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
+}
+
+function calcularVencimento(dataStr, dias) {
+  const d = new Date(dataStr + "T12:00:00");
+  d.setDate(d.getDate() + dias);
+  return d;
+}
+
+document.getElementById("form-aviso").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  if (!validar()) return;
+
+  const btn = document.getElementById("btn-enviar");
+  btn.classList.add("loading"); btn.disabled = true;
+
+  try {
+    const agora      = new Date();
+    const pad        = x => String(x).padStart(2,"0");
+    const protocolo  = `AP-${agora.getFullYear()}${pad(agora.getMonth()+1)}${pad(agora.getDate())}-${pad(agora.getHours())}${pad(agora.getMinutes())}${pad(agora.getSeconds())}`;
+    const dataHora   = `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} às ${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+    const dataInicio = document.getElementById("data-inicio").value;
+    const venc       = calcularVencimento(dataInicio, prazoDias);
+
+    const dados = {
+      action:       "registrarAvisoPrevio",
+      protocolo,
+      dataHora,
+      nome:         document.getElementById("nome").value.trim(),
+      crm:          document.getElementById("crm").value.trim(),
+      crmUf:        document.getElementById("crm-uf").value,
+      email:        document.getElementById("email").value.trim(),
+      hospital:     document.getElementById("hospital").value,
+      setor:        document.getElementById("setor").value.trim(),
+      turno:        document.getElementById("turno").value,
+      diasSemana:   document.getElementById("dia-semana").value.trim(),
+      dataInicio:   formatarData(dataInicio),
+      prazoDias,
+      dataVencimento: formatarData(venc),
+      dataVencISO:  venc.toISOString(),
+      motivoSaida:  document.getElementById("motivo-saida").value,
+      obs:          document.getElementById("obs").value.trim(),
+      status:       "Ativo",
+    };
+
+    if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method:"POST", body:JSON.stringify(dados),
+          headers:{"Content-Type":"application/json"}
+        });
+      } catch(err) { console.warn("Apps Script indisponível:", err); }
+    }
+
+    // Preenche confirmação
+    document.getElementById("conf-protocolo").textContent = protocolo;
+    document.getElementById("conf-datahora").textContent  = dataHora;
+    document.getElementById("res-nome").textContent    = dados.nome;
+    document.getElementById("res-crm").textContent     = `CRM-${dados.crmUf} ${dados.crm}`;
+    document.getElementById("res-hospital").textContent= dados.hospital;
+    document.getElementById("res-turno").textContent   = dados.turno;
+    document.getElementById("res-dias").textContent    = dados.diasSemana;
+    document.getElementById("res-d0").textContent      = dados.dataInicio;
+    document.getElementById("res-prazo").textContent   = prazoDias + " dias corridos";
+    document.getElementById("res-venc").textContent    = dados.dataVencimento;
+
+    const diasRest = Math.ceil((venc - new Date()) / 86400000);
+    document.getElementById("res-prazo-badge").innerHTML =
+      `<div class="prazo-badge-grande ${diasRest > 30 ? 'ok' : ''}">
+        ⏱ Vence em ${diasRest} dias — ${dados.dataVencimento}
+      </div>`;
+
+    document.getElementById("tela-form").style.display = "none";
+    const tc = document.getElementById("tela-confirmacao");
+    tc.style.display = "block"; tc.classList.add("vis");
+    window.scrollTo({top:0, behavior:"smooth"});
+
+  } catch(err) {
+    console.error(err);
+    btn.classList.remove("loading"); btn.disabled = false;
+    alert("Erro ao registrar. Tente novamente.");
+  }
+});
+
+function reiniciar() {
+  document.getElementById("form-aviso").reset();
+  prazoDias = 0;
+  document.getElementById("opt-90").classList.remove("sel");
+  document.getElementById("opt-180").classList.remove("sel");
+  document.getElementById("preview-prazo").classList.remove("vis");
+  document.getElementById("tela-confirmacao").style.display = "none";
+  document.getElementById("tela-form").style.display = "block";
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// Data padrão = hoje
+document.getElementById("data-inicio").valueAsDate = new Date();
+atualizarPreview();
+</script>
+</body>
+</html>
