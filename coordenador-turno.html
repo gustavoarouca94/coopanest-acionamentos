@@ -1060,7 +1060,7 @@ async function concluirTurno() {
   };
 
   try {
-    if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+    if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
       await fetch(APPS_SCRIPT_URL, {
         method: "POST", body: JSON.stringify(payload),
         headers: {"Content-Type":"application/json"}
