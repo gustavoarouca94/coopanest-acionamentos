@@ -994,7 +994,7 @@ function apReserva(protocolo) {
 const _carregarDadosOriginal = carregarDados;
 carregarDados = async function() {
   await _carregarDadosOriginal();
-  if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+  if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
     try {
       const url  = APPS_SCRIPT_URL + "?action=listarAvisosPrevios";
       const resp = await fetch(url);
