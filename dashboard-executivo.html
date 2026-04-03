@@ -477,7 +477,7 @@ tbody tr:hover td { background: var(--surface2); }
 </div><!-- /main -->
 
 <script>
-const APPS_SCRIPT_URL = "COLE_AQUI_A_URL_DO_WEB_APP";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
 
 // ── Dados demo robustos
 const DEMO = gerarDemoData();
@@ -562,7 +562,7 @@ let avisosPreviosDash = [
 
 // ── Carregar dados
 async function carregarDados() {
-  if (APPS_SCRIPT_URL !== "COLE_AQUI_A_URL_DO_WEB_APP") {
+  if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
     try {
       const url  = APPS_SCRIPT_URL + "?action=listarAcionamentos";
       const resp = await fetch(url);
