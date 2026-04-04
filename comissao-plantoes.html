@@ -74,7 +74,18 @@ body {
 }
 
 
-/* ── TABS ── */
+/* ── MODAL VAGAS - checkboxes de dia ── */
+#vg-f-dias-wrap label {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border: 1.5px solid var(--cinza-2);
+  border-radius: 20px; font-size: 13px; color: var(--texto);
+  font-family: 'DM Sans', sans-serif; cursor: pointer;
+  transition: all .15s;
+}
+#vg-f-dias-wrap label:has(input:checked) {
+  background: var(--verde); border-color: var(--verde); color: white; font-weight: 600;
+}
+#vg-f-dias-wrap input[type="checkbox"] { display: none; }
 .tabs-bar {
   background: var(--verde-logo);
   border-top: 1px solid rgba(255,255,255,.08);
@@ -592,8 +603,20 @@ body {
 
       <!-- Slot / Descrição -->
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Descrição do slot <span style="color:var(--erro)">*</span></label>
-        <input id="vg-f-slot" type="text" placeholder="Ex: Sala 01 — Sábado" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Dia(s) da semana <span style="color:var(--erro)">*</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;" id="vg-f-dias-wrap">
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Seg"> Seg</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Ter"> Ter</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Qua"> Qua</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Qui"> Qui</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Sex"> Sex</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Sáb"> Sáb</label>
+          <label style="cursor:pointer;"><input type="checkbox" name="vg-dia" value="Dom"> Dom</label>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Descrição do slot <span style="font-size:11px;color:var(--cinza-3);font-weight:400;text-transform:none;">(opcional)</span></label>
+        <input id="vg-f-slot" type="text" placeholder="Ex: Sala 01, CC, SRPA..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
       </div>
 
       <!-- Duração + Tipo -->
@@ -1197,6 +1220,8 @@ function vgAbrirModalNova() {
   document.getElementById("vg-f-retorno").value       = "";
   document.getElementById("vg-f-obs").value           = "";
   document.getElementById("vg-modal-erro").style.display = "none";
+  // Reset dias
+  document.querySelectorAll('input[name="vg-dia"]').forEach(cb => cb.checked = false);
   vgToggleLMFields();
   document.getElementById("vg-modal-overlay").style.display = "flex";
 }
@@ -1216,6 +1241,7 @@ function vgSalvarVaga() {
   const hospital = sel.value === "__outro__"
     ? document.getElementById("vg-f-hospital-txt").value.trim()
     : sel.value;
+  const dias        = [...document.querySelectorAll('input[name="vg-dia"]:checked')].map(cb => cb.value);
   const slot        = document.getElementById("vg-f-slot").value.trim();
   const turno       = document.getElementById("vg-f-turno").value;
   const tipo        = document.getElementById("vg-f-tipo").value;
@@ -1224,9 +1250,14 @@ function vgSalvarVaga() {
   const obs         = document.getElementById("vg-f-obs").value.trim();
   const errEl       = document.getElementById("vg-modal-erro");
 
-  if (!hospital || !slot) {
+  if (!hospital) {
     errEl.style.display = "block";
-    errEl.textContent   = "Hospital e Descrição do slot são obrigatórios.";
+    errEl.textContent   = "Selecione o hospital / serviço.";
+    return;
+  }
+  if (dias.length === 0) {
+    errEl.style.display = "block";
+    errEl.textContent   = "Selecione ao menos um dia da semana.";
     return;
   }
   if ((tipo === "lm" || tipo === "disciplinar") && !plantonista) {
@@ -1236,9 +1267,17 @@ function vgSalvarVaga() {
   }
 
   errEl.style.display = "none";
+
+  // Slot auto-gerado se não preenchido
+  const slotFinal = slot || turno + " — " + dias.join("/");
+
   const novaVaga = {
     id:         "VG" + String(vgProxId++).padStart(3, "0"),
-    hospital, slot, turno, tipo,
+    hospital,
+    slot:       slotFinal,
+    dias,                   // array de dias — usado na Escala Semanal
+    turno,
+    tipo,
     status:     "Aberta",
     voluntario: "",
     obs,
@@ -1246,11 +1285,25 @@ function vgSalvarVaga() {
   };
 
   vagasEstruturais.push(novaVaga);
+
+  // Adiciona também aos acionamentos fixos da escala semanal
+  dias.forEach(dia => {
+    ES_ACIONAMENTOS_FIXOS.push({
+      dia,
+      turno: turno.includes("Noturno") ? "N" : "D",
+      hospital,
+      slot:        slotFinal,
+      plantonista: plantonista || "—",
+      tipo,
+      retorno:     retorno || (tipo === "vago" || tipo === "vago_quinzenal" ? "—" : "Em aberto"),
+    });
+  });
+
   vgFecharModal();
   atualizarBadge();
   vgSetFiltro("todos", document.querySelector("#tela-vagas .filtro-btn"));
   vgRender();
-  mostrarToast("✓ Vaga adicionada: " + hospital);
+  mostrarToast("✓ Vaga adicionada: " + hospital + " (" + dias.join(", ") + ")");
 }
 
 // ════ ESCALA SEMANAL ════
