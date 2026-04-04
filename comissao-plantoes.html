@@ -641,6 +641,21 @@ body {
         </div>
       </div>
 
+      <!-- Campo quinzena — só para vago_quinzenal -->
+      <div id="vg-f-quinzena-campo" style="display:none;">
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Quinzena <span style="color:var(--erro)">*</span></label>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <label style="flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:9px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;gap:6px;transition:all .15s;" id="vg-q-a-label">
+            <input type="radio" name="vg-quinzena" value="A" id="vg-q-a" style="display:none;" onchange="vgStyleQuinzena()">
+            Quinzena A <span style="font-size:11px;color:var(--cinza-4);font-weight:400;">(semanas 1 e 3)</span>
+          </label>
+          <label style="flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:9px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;gap:6px;transition:all .15s;" id="vg-q-b-label">
+            <input type="radio" name="vg-quinzena" value="B" id="vg-q-b" style="display:none;" onchange="vgStyleQuinzena()">
+            Quinzena B <span style="font-size:11px;color:var(--cinza-4);font-weight:400;">(semanas 2 e 4)</span>
+          </label>
+        </div>
+      </div>
+
       <!-- Campos extras para LM/Disciplinar -->
       <div id="vg-f-lm-campos" style="display:none;flex-direction:column;gap:12px;">
         <div>
@@ -656,7 +671,7 @@ body {
       <!-- Observações -->
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Observações</label>
-        <input id="vg-f-obs" type="text" placeholder="Opcional — quinzenal, início, detalhes..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="vg-f-obs" type="text" placeholder="Opcional — início, detalhes..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
       </div>
     </div>
 
@@ -1220,8 +1235,9 @@ function vgAbrirModalNova() {
   document.getElementById("vg-f-retorno").value       = "";
   document.getElementById("vg-f-obs").value           = "";
   document.getElementById("vg-modal-erro").style.display = "none";
-  // Reset dias
   document.querySelectorAll('input[name="vg-dia"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('input[name="vg-quinzena"]').forEach(r => r.checked = false);
+  vgStyleQuinzena();
   vgToggleLMFields();
   document.getElementById("vg-modal-overlay").style.display = "flex";
 }
@@ -1230,10 +1246,20 @@ function vgFecharModal() {
   document.getElementById("vg-modal-overlay").style.display = "none";
 }
 
+function vgStyleQuinzena() {
+  const base = "flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:9px;border:1.5px solid;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;gap:6px;transition:all .15s;";
+  const aEl = document.getElementById("vg-q-a-label");
+  const bEl = document.getElementById("vg-q-b-label");
+  const aChk = document.getElementById("vg-q-a");
+  const bChk = document.getElementById("vg-q-b");
+  if (aEl) aEl.style.cssText = base + (aChk && aChk.checked ? "border-color:var(--verde);background:var(--verde);color:white;" : "border-color:var(--cinza-2);color:var(--texto);");
+  if (bEl) bEl.style.cssText = base + (bChk && bChk.checked ? "border-color:var(--info);background:var(--info);color:white;" : "border-color:var(--cinza-2);color:var(--texto);");
+}
+
 function vgToggleLMFields() {
   const tipo = document.getElementById("vg-f-tipo").value;
-  const campos = document.getElementById("vg-f-lm-campos");
-  campos.style.display = (tipo === "lm" || tipo === "disciplinar") ? "flex" : "none";
+  document.getElementById("vg-f-lm-campos").style.display      = (tipo === "lm" || tipo === "disciplinar") ? "flex" : "none";
+  document.getElementById("vg-f-quinzena-campo").style.display  = tipo === "vago_quinzenal" ? "block" : "none";
 }
 
 function vgSalvarVaga() {
@@ -1248,54 +1274,49 @@ function vgSalvarVaga() {
   const plantonista = document.getElementById("vg-f-plantonista").value.trim();
   const retorno     = document.getElementById("vg-f-retorno").value.trim();
   const obs         = document.getElementById("vg-f-obs").value.trim();
+  const quinzenaEl  = document.querySelector('input[name="vg-quinzena"]:checked');
+  const quinzena    = quinzenaEl ? quinzenaEl.value : null;
   const errEl       = document.getElementById("vg-modal-erro");
 
   if (!hospital) {
-    errEl.style.display = "block";
-    errEl.textContent   = "Selecione o hospital / serviço.";
-    return;
+    errEl.style.display = "block"; errEl.textContent = "Selecione o hospital / serviço."; return;
   }
   if (dias.length === 0) {
-    errEl.style.display = "block";
-    errEl.textContent   = "Selecione ao menos um dia da semana.";
-    return;
+    errEl.style.display = "block"; errEl.textContent = "Selecione ao menos um dia da semana."; return;
+  }
+  if (tipo === "vago_quinzenal" && !quinzena) {
+    errEl.style.display = "block"; errEl.textContent = "Selecione Quinzena A ou Quinzena B."; return;
   }
   if ((tipo === "lm" || tipo === "disciplinar") && !plantonista) {
-    errEl.style.display = "block";
-    errEl.textContent   = "Informe o nome do plantonista afastado.";
-    return;
+    errEl.style.display = "block"; errEl.textContent = "Informe o nome do plantonista afastado."; return;
   }
 
   errEl.style.display = "none";
-
-  // Slot auto-gerado se não preenchido
-  const slotFinal = slot || turno + " — " + dias.join("/");
+  const slotFinal = slot || (turno + " — " + dias.join("/") + (quinzena ? " [Q"+quinzena+"]" : ""));
 
   const novaVaga = {
-    id:         "VG" + String(vgProxId++).padStart(3, "0"),
-    hospital,
-    slot:       slotFinal,
-    dias,                   // array de dias — usado na Escala Semanal
-    turno,
-    tipo,
-    status:     "Aberta",
-    voluntario: "",
-    obs,
+    id: "VG" + String(vgProxId++).padStart(3, "0"),
+    hospital, slot: slotFinal, dias, turno, tipo, quinzena,
+    status: "Aberta", voluntario: "", obs,
     ...(plantonista ? { plantonista, retorno: retorno || "Em aberto" } : {}),
   };
-
   vagasEstruturais.push(novaVaga);
 
-  // Adiciona também aos acionamentos fixos da escala semanal
+  // Sincroniza com Escala Semanal — tipo correto, sem confundir com LM
+  const turnoKey = turno.includes("Noturno") ? "N" : "D";
+  const tagEscala = tipo === "lm" ? "lm"
+                  : tipo === "disciplinar" ? "disciplinar"
+                  : tipo === "vago_quinzenal" ? "quinzenal"
+                  : "vago";
+
   dias.forEach(dia => {
     ES_ACIONAMENTOS_FIXOS.push({
-      dia,
-      turno: turno.includes("Noturno") ? "N" : "D",
-      hospital,
-      slot:        slotFinal,
+      dia, turno: turnoKey, hospital,
+      slot: slotFinal,
       plantonista: plantonista || "—",
-      tipo,
-      retorno:     retorno || (tipo === "vago" || tipo === "vago_quinzenal" ? "—" : "Em aberto"),
+      tipo: tagEscala,
+      quinzena: quinzena || null,
+      retorno: retorno || (tagEscala === "vago" || tagEscala === "quinzenal" ? "—" : "Em aberto"),
     });
   });
 
@@ -1303,7 +1324,7 @@ function vgSalvarVaga() {
   atualizarBadge();
   vgSetFiltro("todos", document.querySelector("#tela-vagas .filtro-btn"));
   vgRender();
-  mostrarToast("✓ Vaga adicionada: " + hospital + " (" + dias.join(", ") + ")");
+  mostrarToast("✓ Vaga adicionada: " + hospital + " (" + dias.join(", ") + (quinzena ? " · Q"+quinzena : "") + ")");
 }
 
 // ════ ESCALA SEMANAL ════
@@ -1447,14 +1468,29 @@ function esRender() {
                        : "var(--verde)";
 
       const fixosHTML = fixos.map(a => {
+        // Cor e label corretos por tipo
         const tagCor = a.tipo === "disciplinar"
           ? "background:var(--erro-bg);color:var(--erro)"
-          : "background:var(--amarelo-bg);color:var(--amarelo)";
-        const urgencia = a.retorno && a.retorno !== "Em aberto" && a.retorno !== "Afastada"
+          : a.tipo === "lm"
+          ? "background:var(--amarelo-bg);color:var(--amarelo)"
+          : a.tipo === "quinzenal"
+          ? "background:var(--info-bg);color:var(--info)"
+          : "background:var(--verde-light);color:var(--verde-dark)"; // vago
+
+        const tagTxt = a.tipo === "disciplinar" ? "Disc."
+          : a.tipo === "lm"       ? "LM"
+          : a.tipo === "quinzenal" ? (a.quinzena ? "Q"+a.quinzena : "Quinz.")
+          : "Vago";
+
+        // Plantonista: mostra "Vaga aberta" para vagos sem plantonista
+        const nomePlantonista = (!a.plantonista || a.plantonista === "—")
+          ? '<span style="color:var(--cinza-4);font-style:italic;">Vaga em aberto</span>'
+          : a.plantonista;
+
+        const urgencia = a.retorno && a.retorno !== "Em aberto" && a.retorno !== "Afastada" && a.retorno !== "—"
           ? (() => {
               const parts = a.retorno.split("/");
               if (parts.length < 2) return "";
-              // retorno no formato dd/mm
               const hoje = new Date();
               const ret = new Date(hoje.getFullYear(), parseInt(parts[1])-1, parseInt(parts[0]));
               const dias = Math.ceil((ret - hoje) / 86400000);
@@ -1464,10 +1500,15 @@ function esRender() {
             })()
           : a.retorno === "Afastada" ? ' <span style="font-size:10px;color:var(--cinza-4);">afastada</span>' : '';
 
+        // Badge extra de quinzena
+        const quinzenaBadge = a.tipo === "quinzenal" && a.quinzena
+          ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--info-bg);color:var(--info);margin-left:4px;">Quinzena ${a.quinzena}</span>`
+          : "";
+
         return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--cinza-0);border-radius:6px;margin-bottom:4px;">
-          <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;${tagCor};white-space:nowrap;">${a.tipo==="disciplinar"?"Disc.":"LM"}</span>
+          <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;${tagCor};white-space:nowrap;">${tagTxt}</span>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.plantonista}${urgencia}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nomePlantonista}${urgencia}${quinzenaBadge}</div>
             <div style="font-size:11px;color:var(--cinza-4);">${a.hospital} — ${a.slot}</div>
           </div>
         </div>`;
