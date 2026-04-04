@@ -352,6 +352,10 @@ body {
       Avisos Prévios
       <span class="badge-tab" id="badge-avisos">0</span>
     </div>
+    <div class="tab" id="tab-vagas" onclick="mudarTab('vagas')">
+      Vagas em Aberto
+      <span class="badge-tab" id="badge-vagas">0</span>
+    </div>
   </div>
 </div>
 
@@ -466,6 +470,108 @@ body {
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- ════ TELA: VAGAS EM ABERTO ════ -->
+<div id="tela-vagas" class="tela wrapper">
+
+  <div style="background:var(--info-bg);border-left:3px solid var(--info);border-radius:0 var(--r) var(--r) 0;padding:11px 16px;margin-bottom:16px;font-size:13px;color:#1d3a6b;">
+    <strong>Vagas estruturais da escala</strong> — plantões marcados como VAGO que precisam de voluntário. Quando um cooperado assumir, registre abaixo. Se não houver voluntário, acione o reserva.
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+    <div class="stat-card urgente" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--erro);" id="vg-st-aberta">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Vagas abertas</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--info);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--info);" id="vg-st-reserva">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Cobertas por reserva</div>
+    </div>
+    <div class="stat-card normal" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--verde);" id="vg-st-voluntario">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Preenchidas por voluntário</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--amarelo);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--amarelo);" id="vg-st-lm">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Descobertas por LM/Afast.</div>
+    </div>
+  </div>
+
+  <div class="filtros-bar" style="margin-bottom:14px;">
+    <button class="filtro-btn ativo" onclick="vgSetFiltro('todos',this)">Todas</button>
+    <button class="filtro-btn" onclick="vgSetFiltro('aberta',this)">Abertas</button>
+    <button class="filtro-btn" onclick="vgSetFiltro('lm',this)">LM / Afastamento</button>
+    <button class="filtro-btn" onclick="vgSetFiltro('preenchida',this)">Preenchidas</button>
+    <input class="busca-input" id="vg-busca" placeholder="Buscar hospital ou dia…" oninput="vgRender()" style="flex:1;min-width:160px;padding:7px 13px;border:1.5px solid var(--cinza-1);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:13px;">
+    <button onclick="vgAbrirModalNova()" style="margin-left:auto;background:var(--verde);color:white;border:none;border-radius:8px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Nova vaga</button>
+  </div>
+
+  <div id="vg-lista"></div>
+</div>
+
+<!-- Modal: Nova / Editar Vaga -->
+<div id="vg-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:var(--r-xl);padding:28px;width:min(520px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <h2 id="vg-modal-titulo" style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--verde-dark);">Nova vaga em aberto</h2>
+      <button onclick="vgFecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--cinza-4);">✕</button>
+    </div>
+
+    <div style="display:grid;gap:14px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Hospital / Serviço <span style="color:var(--erro)">*</span></label>
+        <input id="vg-f-hospital" type="text" placeholder="Ex: HR — Hemodinâmica" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Slot / Descrição <span style="color:var(--erro)">*</span></label>
+        <input id="vg-f-slot" type="text" placeholder="Ex: Sala 01 Manhã — Sáb" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Turno <span style="color:var(--erro)">*</span></label>
+          <select id="vg-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+            <option value="Diurno">Diurno</option>
+            <option value="Noturno">Noturno</option>
+            <option value="Diurno/Noturno">Diurno + Noturno</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Tipo <span style="color:var(--erro)">*</span></label>
+          <select id="vg-f-tipo" onchange="vgToggleLMFields()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+            <option value="vago">Vaga Estrutural (VAGO)</option>
+            <option value="vago_quinzenal">Vaga Quinzenal</option>
+            <option value="lm">Licença Maternidade</option>
+            <option value="disciplinar">Afastamento Disciplinar</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Campos extras para LM/Disciplinar -->
+      <div id="vg-f-lm-campos" style="display:none;grid-gap:12px;display:none;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Plantonista original</label>
+          <input id="vg-f-plantonista" type="text" placeholder="Nome do plantonista afastado" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Retorno previsto</label>
+          <input id="vg-f-retorno" type="text" placeholder="Ex: 17/04/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Observações</label>
+        <input id="vg-f-obs" type="text" placeholder="Opcional" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+      </div>
+    </div>
+
+    <div id="vg-modal-erro" style="display:none;color:var(--erro);font-size:13px;margin-top:12px;"></div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+      <button onclick="vgFecharModal()" style="background:var(--cinza-1);color:var(--texto);border:none;border-radius:8px;padding:9px 20px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;">Cancelar</button>
+      <button onclick="vgSalvarVaga()" style="background:var(--verde);color:white;border:none;border-radius:8px;padding:9px 20px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">Salvar vaga</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec";
@@ -817,6 +923,7 @@ function mudarTab(tab) {
   document.getElementById("tab-" + tab).classList.add("ativa");
   document.getElementById("tela-" + tab).classList.add("vis");
   if (tab === "avisos") apRender();
+  if (tab === "vagas")  vgRender();
 }
 
 function atualizarBadge() {
@@ -828,11 +935,212 @@ function atualizarBadge() {
   badge.textContent = n;
   badge.classList.toggle("vis", n > 0);
 
-  // Badge de avisos prévios urgentes
   const nAP = avisosPrevios.filter(a => a.status === "Ativo" && apDiasRest(a) <= 15 && apDiasRest(a) >= 0).length;
   const badgeAP = document.getElementById("badge-avisos");
   badgeAP.textContent = nAP;
   badgeAP.classList.toggle("vis", nAP > 0);
+
+  const nVG = vagasEstruturais.filter(v => v.status === "Aberta").length;
+  const badgeVG = document.getElementById("badge-vagas");
+  badgeVG.textContent = nVG;
+  badgeVG.classList.toggle("vis", nVG > 0);
+}
+
+// ════ VAGAS ESTRUTURAIS ════
+// Vagas pré-carregadas: apenas LM e afastamentos confirmados
+// Vagas estruturais (VAGO) devem ser adicionadas manualmente pela Comissão
+let vagasEstruturais = [
+  // ── AFASTAMENTO DISCIPLINAR
+  { id:"VG001", hospital:"HAM — Hemodinâmica", slot:"Segunda diurno 12h",    turno:"Diurno",  tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
+  { id:"VG002", hospital:"Reservas",           slot:"8° Reserva — Qua diurno", turno:"Diurno", tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
+  { id:"VG003", hospital:"HAM",                slot:"COB — Sáb noturno",     turno:"Noturno", tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
+  // ── LICENÇAS MATERNIDADE
+  { id:"VG004", hospital:"IMIP / SR Oscar",    slot:"Qui diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Rafaella Guedes",     retorno:"12/04/2026", status:"Reserva", voluntario:"", obs:"LM até 12/04" },
+  { id:"VG005", hospital:"Reservas",           slot:"1° Reserva — Seg diurno", turno:"Diurno", tipo:"lm", plantonista:"Rafaella Guedes",    retorno:"12/04/2026", status:"Reserva", voluntario:"", obs:"LM até 12/04" },
+  { id:"VG006", hospital:"IMIP Maternidade",   slot:"COB — Seg diurno",      turno:"Diurno",  tipo:"lm", plantonista:"Elisa Serra",         retorno:"17/04/2026", status:"Reserva", voluntario:"", obs:"LM até 17/04" },
+  { id:"VG007", hospital:"IMIP Maternidade",   slot:"COB — Ter noturno",     turno:"Noturno", tipo:"lm", plantonista:"Elisa Serra",         retorno:"17/04/2026", status:"Reserva", voluntario:"", obs:"LM até 17/04" },
+  { id:"VG008", hospital:"HBL",                slot:"Sáb noturno",           turno:"Noturno", tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
+  { id:"VG009", hospital:"HGV",                slot:"Ter diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
+  { id:"VG010", hospital:"HBL",                slot:"Qua diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
+  { id:"VG011", hospital:"HMA",                slot:"Qua diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
+  { id:"VG012", hospital:"Reservas",           slot:"2° Reserva — Sex diurno", turno:"Diurno", tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
+  { id:"VG013", hospital:"Reservas",           slot:"2° Reserva — Dom diurno", turno:"Diurno", tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
+  { id:"VG014", hospital:"Reservas",           slot:"7° Reserva — Qui diurno", turno:"Diurno", tipo:"lm", plantonista:"Larissa Tavares",    retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
+  { id:"VG015", hospital:"CISAM",              slot:"Sex diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Larissa Tavares",     retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
+  { id:"VG016", hospital:"HR — Imagem TC",     slot:"Sex noturno",           turno:"Noturno", tipo:"lm", plantonista:"Larissa Tavares",     retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
+  { id:"VG017", hospital:"HOF",                slot:"Sex noturno",           turno:"Noturno", tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
+  { id:"VG018", hospital:"HAM",                slot:"3° PL — Ter diurno",   turno:"Diurno",  tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
+  { id:"VG019", hospital:"HAM",                slot:"3° PL — Qua diurno",   turno:"Diurno",  tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
+];
+
+let vgFiltro = "todos";
+
+function vgSetFiltro(f, el) {
+  vgFiltro = f;
+  document.querySelectorAll("#tela-vagas .filtro-btn").forEach(b => b.classList.remove("ativo"));
+  el.classList.add("ativo");
+  vgRender();
+}
+
+function vgRender() {
+  document.getElementById("vg-st-aberta").textContent     = vagasEstruturais.filter(v => v.status === "Aberta").length;
+  document.getElementById("vg-st-reserva").textContent    = vagasEstruturais.filter(v => v.status === "Reserva").length;
+  document.getElementById("vg-st-voluntario").textContent = vagasEstruturais.filter(v => v.status === "Preenchida").length;
+  document.getElementById("vg-st-lm").textContent         = vagasEstruturais.filter(v => v.tipo === "lm" || v.tipo === "disciplinar").length;
+
+  let itens = [...vagasEstruturais];
+  if (vgFiltro === "aberta")      itens = itens.filter(v => v.status === "Aberta");
+  else if (vgFiltro === "lm")     itens = itens.filter(v => v.tipo === "lm" || v.tipo === "disciplinar");
+  else if (vgFiltro === "preenchida") itens = itens.filter(v => v.status === "Preenchida");
+
+  const busca = document.getElementById("vg-busca").value.toLowerCase();
+  if (busca) itens = itens.filter(v =>
+    v.hospital.toLowerCase().includes(busca) ||
+    v.slot.toLowerCase().includes(busca) ||
+    (v.plantonista||"").toLowerCase().includes(busca)
+  );
+
+  const lista = document.getElementById("vg-lista");
+  if (!itens.length) {
+    lista.innerHTML = `<div class="empty-state"><div class="em-icon">✅</div><strong>Nenhuma vaga neste filtro</strong></div>`;
+    return;
+  }
+
+  lista.innerHTML = itens.map(v => {
+    const corBorda = v.status === "Aberta" ? "var(--erro)" : v.status === "Reserva" ? "var(--info)" : "var(--verde)";
+    const tagCor   = v.tipo === "disciplinar" ? "background:var(--erro-bg);color:var(--erro)"
+                   : v.tipo === "lm"          ? "background:var(--amarelo-bg);color:var(--amarelo)"
+                   :                            "background:var(--info-bg);color:var(--info)";
+    const tagTxt   = v.tipo === "disciplinar" ? "Afastamento Disciplinar"
+                   : v.tipo === "lm" ? "Licença Maternidade" : "Vaga Estrutural";
+    const statusCor= v.status === "Aberta"    ? "background:var(--erro-bg);color:var(--erro)"
+                   : v.status === "Reserva"   ? "background:var(--info-bg);color:var(--info)"
+                   :                            "background:var(--verde-light);color:var(--verde)";
+    const infoExtra = v.plantonista ? `
+      <div class="dc"><div class="dl">Plantonista original</div><div class="dv">${v.plantonista}</div></div>
+      <div class="dc"><div class="dl">Retorno previsto</div><div class="dv">${v.retorno||"—"}</div></div>` : "";
+    const btnAcoes = v.status !== "Preenchida" ? `
+      <button class="btn-acao btn-confirmar-atestado" onclick="vgRegistrarVoluntario('${v.id}')">✓ Voluntário assumiu</button>
+      ${v.status === "Aberta" ? `<button class="btn-acao" style="background:var(--info-bg);color:var(--info);" onclick="vgAcionarReserva('${v.id}')">⚡ Cobrir com reserva</button>` : ""}
+      <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>
+    ` : `<span style="font-size:12px;color:var(--verde);font-weight:600;">✓ Preenchida por ${v.voluntario}</span>
+      <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>`;
+
+    return `<div class="acion-card" style="border-left:4px solid ${corBorda};margin-bottom:10px;">
+      <div class="acion-header">
+        <div class="acion-info">
+          <div class="acion-nome">${v.hospital}</div>
+          <div class="acion-sub">${v.slot} · ${v.turno}</div>
+          <div class="acion-tags">
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">${tagTxt}</span>
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${statusCor}">${v.status}</span>
+          </div>
+        </div>
+      </div>
+      <div class="acion-body">
+        ${infoExtra}
+        ${v.obs ? `<div class="dc" style="grid-column:1/-1"><div class="dl">Obs</div><div class="dv">${v.obs}</div></div>` : ""}
+      </div>
+      <div class="acion-acoes">${btnAcoes}<span class="protocolo-label">${v.id}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function vgRegistrarVoluntario(id) {
+  const v = vagasEstruturais.find(x => x.id === id);
+  if (!v) return;
+  const nome = prompt(`Nome do voluntário que assumiu:\n${v.hospital} — ${v.slot}`);
+  if (!nome || !nome.trim()) return;
+  v.voluntario = nome.trim();
+  v.status = "Preenchida";
+  enviarAcao({ action:"preencherVaga", id, voluntario:nome.trim() });
+  atualizarBadge(); vgRender();
+  mostrarToast("✓ Vaga preenchida por " + nome.trim());
+}
+
+function vgAcionarReserva(id) {
+  const v = vagasEstruturais.find(x => x.id === id);
+  if (!v) return;
+  if (!confirm(`Confirmar cobertura por reserva:\n${v.hospital} — ${v.slot}?`)) return;
+  v.status = "Reserva";
+  enviarAcao({ action:"vagaReserva", id });
+  atualizarBadge(); vgRender();
+  mostrarToast("⚡ Vaga marcada para cobertura por reserva");
+}
+
+function vgDeletar(id) {
+  const v = vagasEstruturais.find(x => x.id === id);
+  if (!v) return;
+  if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nEsta ação não pode ser desfeita.`)) return;
+  vagasEstruturais = vagasEstruturais.filter(x => x.id !== id);
+  atualizarBadge(); vgRender();
+  mostrarToast("Vaga removida");
+}
+
+let vgProxId = 100; // IDs manuais começam em VG100
+
+function vgAbrirModalNova() {
+  document.getElementById("vg-modal-titulo").textContent = "Nova vaga em aberto";
+  document.getElementById("vg-f-hospital").value    = "";
+  document.getElementById("vg-f-slot").value        = "";
+  document.getElementById("vg-f-turno").value       = "Diurno";
+  document.getElementById("vg-f-tipo").value        = "vago";
+  document.getElementById("vg-f-plantonista").value = "";
+  document.getElementById("vg-f-retorno").value     = "";
+  document.getElementById("vg-f-obs").value         = "";
+  document.getElementById("vg-modal-erro").style.display = "none";
+  vgToggleLMFields();
+  const overlay = document.getElementById("vg-modal-overlay");
+  overlay.style.display = "flex";
+}
+
+function vgFecharModal() {
+  document.getElementById("vg-modal-overlay").style.display = "none";
+}
+
+function vgToggleLMFields() {
+  const tipo = document.getElementById("vg-f-tipo").value;
+  const campos = document.getElementById("vg-f-lm-campos");
+  campos.style.display = (tipo === "lm" || tipo === "disciplinar") ? "flex" : "none";
+}
+
+function vgSalvarVaga() {
+  const hospital = document.getElementById("vg-f-hospital").value.trim();
+  const slot     = document.getElementById("vg-f-slot").value.trim();
+  const turno    = document.getElementById("vg-f-turno").value;
+  const tipo     = document.getElementById("vg-f-tipo").value;
+  const plantonista = document.getElementById("vg-f-plantonista").value.trim();
+  const retorno  = document.getElementById("vg-f-retorno").value.trim();
+  const obs      = document.getElementById("vg-f-obs").value.trim();
+  const errEl    = document.getElementById("vg-modal-erro");
+
+  if (!hospital || !slot) {
+    errEl.style.display = "block";
+    errEl.textContent   = "Hospital e Slot são obrigatórios.";
+    return;
+  }
+  if ((tipo === "lm" || tipo === "disciplinar") && !plantonista) {
+    errEl.style.display = "block";
+    errEl.textContent   = "Informe o nome do plantonista afastado.";
+    return;
+  }
+
+  errEl.style.display = "none";
+  const novaVaga = {
+    id:          "VG" + String(vgProxId++).padStart(3,"0"),
+    hospital, slot, turno, tipo,
+    status:      "Aberta",
+    voluntario:  "",
+    obs,
+    ...(plantonista ? { plantonista, retorno: retorno || "Em aberto" } : {}),
+  };
+
+  vagasEstruturais.push(novaVaga);
+  vgFecharModal();
+  atualizarBadge();
+  vgSetFiltro("todos", document.querySelector("#tela-vagas .filtro-btn"));
+  vgRender();
+  mostrarToast("✓ Vaga adicionada: " + hospital);
 }
 
 // ════ AVISOS PRÉVIOS ════
