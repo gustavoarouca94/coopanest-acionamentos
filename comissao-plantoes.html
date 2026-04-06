@@ -776,20 +776,82 @@ let acionamentoAtual = null;
 // ── Inicialização
 document.addEventListener("DOMContentLoaded", () => {
   carregarDados();
+  vgCarregarVagas();
   esBuscarReposicoes();
   document.getElementById("ultima-atualizacao").textContent = "Atualizado em " + horaAtual();
 });
 
 async function carregarDados() {
-  if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
-    try {
-      const url  = APPS_SCRIPT_URL + "?action=listarAcionamentos";
-      const resp = await fetch(url);
-      const json = await resp.json();
-      if (json.ok) acionamentos = json.dados;
-    } catch(e) { console.warn("Usando dados demo:", e); }
-  }
+  try {
+    const url  = APPS_SCRIPT_URL + "?action=listarAcionamentos";
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (json.ok) acionamentos = json.dados;
+  } catch(e) { console.warn("Usando dados demo:", e); }
   renderTudo();
+}
+
+// ── Carrega vagas estruturais salvas no Apps Script
+// Substitui completamente as vagas VAGO/quinzenal do Sheets;
+// mantém apenas as LMs/disciplinares que são hardcoded.
+async function vgCarregarVagas() {
+  const LM_IDS = new Set(vagasEstruturais.filter(v => v.tipo === "lm" || v.tipo === "disciplinar").map(v => v.id));
+
+  try {
+    const url  = APPS_SCRIPT_URL + "?action=listarVagas";
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (!json.ok) throw new Error("Resposta inválida");
+
+    // Mantém só as LMs/disciplinares hardcoded, descarta as estruturais antigas
+    vagasEstruturais = vagasEstruturais.filter(v => LM_IDS.has(v.id));
+
+    // Remove entradas estruturais antigas do array da Escala Semanal
+    // (mantém apenas as que são de LM ou disciplinar)
+    const lmTipos = new Set(["lm","disciplinar"]);
+    while (ES_ACIONAMENTOS_FIXOS.length > 0 && !lmTipos.has(ES_ACIONAMENTOS_FIXOS[ES_ACIONAMENTOS_FIXOS.length-1].tipo)) {
+      ES_ACIONAMENTOS_FIXOS.pop();
+    }
+    // Reconstrói a partir do início — remove todas as não-LM
+    for (let i = ES_ACIONAMENTOS_FIXOS.length - 1; i >= 0; i--) {
+      if (!lmTipos.has(ES_ACIONAMENTOS_FIXOS[i].tipo)) ES_ACIONAMENTOS_FIXOS.splice(i, 1);
+    }
+
+    // Adiciona as vagas do Sheets
+    json.dados.forEach(v => {
+      if (v.status === "Deletada") return;
+      vagasEstruturais.push(v);
+
+      if (v.dias && Array.isArray(v.dias)) {
+        const turnoKey = (v.turno || "").includes("Noturno") ? "N" : "D";
+        const tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
+        v.dias.forEach(dia => {
+          ES_ACIONAMENTOS_FIXOS.push({
+            dia, turno: turnoKey,
+            hospital:    v.hospital,
+            slot:        v.slot,
+            plantonista: v.plantonista || "—",
+            tipo:        tipoEscala,
+            quinzena:    v.quinzena || null,
+            retorno:     v.retorno || "—",
+          });
+        });
+      }
+    });
+
+    // Atualiza vgProxId para não conflitar com IDs do Sheets
+    const maxNum = json.dados.reduce((max, v) => {
+      const n = parseInt((v.id || "VG0").replace("VG","")) || 0;
+      return Math.max(max, n);
+    }, 200);
+    vgProxId = maxNum + 1;
+
+    atualizarBadge();
+    vgRender();
+    esRender();
+  } catch(e) {
+    console.warn("Vagas do Sheets indisponíveis, usando apenas dados pré-carregados:", e);
+  }
 }
 
 function renderTudo() {
@@ -1029,7 +1091,7 @@ async function confirmarReposicao(protocolo) {
 }
 
 async function enviarAcao(payload) {
-  if (APPS_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") return;
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("COLE_AQUI")) return;
   try {
     await fetch(APPS_SCRIPT_URL, {
       method: "POST", body: JSON.stringify(payload),
@@ -1210,11 +1272,12 @@ function vgDeletar(id) {
   if (!v) return;
   if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nEsta ação não pode ser desfeita.`)) return;
   vagasEstruturais = vagasEstruturais.filter(x => x.id !== id);
+  enviarAcao({ action: "deletarVaga", id });
   atualizarBadge(); vgRender();
   mostrarToast("Vaga removida");
 }
 
-let vgProxId = 100; // IDs manuais começam em VG100
+let vgProxId = 1; // IDs manuais: VGM001, VGM002...
 
 function vgHospitalChange() {
   const sel = document.getElementById("vg-f-hospital-sel");
@@ -1295,12 +1358,15 @@ function vgSalvarVaga() {
   const slotFinal = slot || (turno + " — " + dias.join("/") + (quinzena ? " [Q"+quinzena+"]" : ""));
 
   const novaVaga = {
-    id: "VG" + String(vgProxId++).padStart(3, "0"),
+    id: "VGM" + String(vgProxId++).padStart(3, "0"),
     hospital, slot: slotFinal, dias, turno, tipo, quinzena,
     status: "Aberta", voluntario: "", obs,
     ...(plantonista ? { plantonista, retorno: retorno || "Em aberto" } : {}),
   };
   vagasEstruturais.push(novaVaga);
+
+  // Persiste no Apps Script
+  enviarAcao({ action: "criarVaga", vaga: novaVaga });
 
   // Sincroniza com Escala Semanal — tipo correto, sem confundir com LM
   const turnoKey = turno.includes("Noturno") ? "N" : "D";

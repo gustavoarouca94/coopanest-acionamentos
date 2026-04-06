@@ -824,23 +824,33 @@ textarea { resize: vertical; min-height: 72px; }
     <p>Relatório enviado com sucesso para o sistema.</p>
   </div>
 
-  <div class="resumo-turno">
-    <div class="resumo-grid">
-      <div class="resumo-stat">
-        <div class="rs-num" id="res-total">0</div>
-        <div class="rs-label">Acionamentos</div>
+  <!-- Comprovante -->
+  <div id="comprovante" style="background:white;border:1px solid var(--cinza-1);border-radius:var(--r-lg);padding:20px 24px;margin-bottom:16px;box-shadow:var(--sombra);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--verde);">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Comprovante de Fechamento de Turno</div>
+        <div style="font-size:18px;font-weight:700;color:var(--verde-dark);font-family:'DM Serif Display',serif;" id="comp-protocolo">TU-—</div>
       </div>
-      <div class="resumo-stat">
-        <div class="rs-num" id="res-confirmados">0</div>
-        <div class="rs-label">Confirmados</div>
-      </div>
-      <div class="resumo-stat">
-        <div class="rs-num" id="res-recusados">0</div>
-        <div class="rs-label">Recusados</div>
+      <div style="text-align:right;font-size:12px;color:var(--cinza-4);">
+        <div id="comp-data">—</div>
+        <div id="comp-hora">—</div>
       </div>
     </div>
-    <div id="resumo-lista"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:13px;">
+      <div><span style="color:var(--cinza-4);">Coordenador:</span> <strong id="comp-coord">—</strong></div>
+      <div><span style="color:var(--cinza-4);">Turno:</span> <strong id="comp-turno">—</strong></div>
+    </div>
+    <div id="comp-lista" style="font-size:12px;border-top:1px solid var(--cinza-1);padding-top:12px;"></div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--cinza-1);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;font-size:12px;">
+      <div><div style="font-size:20px;font-weight:700;color:var(--verde-dark);" id="comp-total">0</div><div style="color:var(--cinza-4);">Total</div></div>
+      <div><div style="font-size:20px;font-weight:700;color:#0a6e3a;" id="comp-conf">0</div><div style="color:var(--cinza-4);">Confirmados</div></div>
+      <div><div style="font-size:20px;font-weight:700;color:var(--erro);" id="comp-recus">0</div><div style="color:var(--cinza-4);">Recusados</div></div>
+    </div>
   </div>
+
+  <button onclick="imprimirComprovante()" style="width:100%;background:var(--verde);color:white;border:none;border-radius:var(--r);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+    🖨️ Imprimir / Salvar como PDF
+  </button>
 
   <button class="btn-novo-turno" onclick="reiniciar()">↩ Iniciar novo turno</button>
 </div>
@@ -1055,13 +1065,45 @@ function iniciarTurno() {
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-// ── Carrega vagas previstas para o dia/turno atual
-function carregarVagasPrevistas() {
+// ── Carrega vagas previstas para o dia/turno atual (LMs fixas + Sheets)
+async function carregarVagasPrevistas() {
   const dia      = turno.dataBruta ? dataToDia(turno.dataBruta) : null;
   const turnoKey = turno.tipo && turno.tipo.includes("Diurno") ? "D" : "N";
   if (!dia) return;
 
-  const previstas = ESCALA_FIXOS.filter(v => v.dia === dia && v.turno === turnoKey);
+  // Busca vagas estruturais salvas no Sheets
+  let vagasSheets = [];
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL + "?action=listarVagas");
+    const json = await resp.json();
+    if (json.ok && json.dados) vagasSheets = json.dados.filter(v => v.status !== "Deletada");
+  } catch(e) { console.warn("Vagas do Sheets indisponíveis, usando apenas fixas"); }
+
+  // Combina fixas (LMs) com as do Sheets (estruturais)
+  const fixas = ESCALA_FIXOS.filter(v => v.dia === dia && v.turno === turnoKey);
+
+  // Converte vagas do Sheets para o formato da escala
+  const vagasDoSheets = vagasSheets
+    .filter(v => v.dias && v.dias.includes(dia))
+    .filter(v => {
+      const tk = (v.turno || "").includes("Noturno") ? "N" : "D";
+      return tk === turnoKey;
+    })
+    .map(v => ({
+      dia, turno: turnoKey,
+      hospital: v.hospital,
+      slot: v.slot,
+      plantonista: v.plantonista || "—",
+      tipo: v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago",
+      quinzena: v.quinzena || null,
+      retorno: v.retorno || "—",
+      status: v.status,
+      id: v.id,
+    }))
+    .filter(v => v.status !== "Preenchida"); // não mostra vagas já preenchidas
+
+  const previstas = [...fixas, ...vagasDoSheets];
+
   const bloco = document.getElementById("bloco-vagas-previstas");
   const lista  = document.getElementById("lista-vagas-previstas");
 
@@ -1071,14 +1113,22 @@ function carregarVagasPrevistas() {
   lista.innerHTML = previstas.map((v, i) => {
     const tagCor = v.tipo === "disciplinar"
       ? "background:var(--erro-bg);color:var(--erro)"
-      : "background:var(--amarelo-bg);color:var(--amarelo)";
-    const tagTxt = v.tipo === "disciplinar" ? "Disc." : "LM";
+      : v.tipo === "lm"
+      ? "background:var(--amarelo-bg);color:var(--amarelo)"
+      : v.tipo === "quinzenal"
+      ? "background:var(--info-bg);color:var(--info)"
+      : "background:var(--verde-light);color:var(--verde)";
+    const tagTxt = v.tipo === "disciplinar" ? "Disc."
+      : v.tipo === "lm" ? "LM"
+      : v.tipo === "quinzenal" ? (v.quinzena ? "Q"+v.quinzena : "Quinz.")
+      : "Vago";
+
     return `<div id="vaga-prev-${i}" style="display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--cinza-1);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;gap:10px;">
       <div style="display:flex;align-items:center;gap:10px;flex:1;">
         <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;${tagCor};white-space:nowrap;">${tagTxt}</span>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--texto);">${v.hospital} <span style="color:var(--cinza-4);font-weight:400;">— ${v.slot}</span></div>
-          <div style="font-size:12px;color:var(--cinza-4);">${v.plantonista || "Vaga em aberto"}</div>
+          <div style="font-size:12px;color:var(--cinza-4);">${v.plantonista && v.plantonista !== "—" ? v.plantonista : "Vaga em aberto"}</div>
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;">
@@ -1088,13 +1138,14 @@ function carregarVagasPrevistas() {
     </div>`;
   }).join("");
 
-  // Popula o select de vagas no modal
+  // Popula o select de vagas no modal — usa previstas combinadas
+  window._vagasPrevistas = previstas;
   const sel = document.getElementById("m-vaga-sel");
   sel.innerHTML = "<option value=''>— Selecione a vaga —</option>";
   previstas.forEach((v, i) => {
     const opt = document.createElement("option");
     opt.value = i;
-    opt.textContent = `${v.hospital} — ${v.slot} (${v.plantonista || "Vaga aberta"})`;
+    opt.textContent = `${v.hospital} — ${v.slot} (${v.plantonista && v.plantonista !== "—" ? v.plantonista : "Vaga aberta"})`;
     sel.appendChild(opt);
   });
   const manOpt = document.createElement("option");
