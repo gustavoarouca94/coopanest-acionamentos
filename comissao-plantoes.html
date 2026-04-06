@@ -1090,14 +1090,35 @@ async function confirmarReposicao(protocolo) {
   mostrarToast("✓ Reposição marcada como cumprida para " + a.nome);
 }
 
+// Envia ações ao Apps Script.
+// Para operações de vaga usa GET (permite ler resposta e confirmar sucesso).
+// Para demais ações usa POST no-cors (Apps Script bloqueia JSON cross-origin no POST).
 async function enviarAcao(payload) {
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("COLE_AQUI")) return;
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("COLE_AQUI")) return null;
+
+  const acoesPorGet = ["criarVaga","deletarVaga","atualizarStatusVaga","preencherVaga","vagaReserva"];
+
+  if (acoesPorGet.includes(payload.action)) {
+    // Serializa o payload como parâmetro GET — o GS lê via e.parameter.payload
+    try {
+      const url = APPS_SCRIPT_URL + "?payload=" + encodeURIComponent(JSON.stringify(payload));
+      const resp = await fetch(url);
+      const json = await resp.json();
+      if (!json.ok) console.warn("Ação falhou:", json.erro || json);
+      return json;
+    } catch(e) { console.warn("Erro na ação GET:", payload.action, e); return null; }
+  }
+
+  // Demais ações (atestado, turno, aviso prévio) via POST no-cors
   try {
     await fetch(APPS_SCRIPT_URL, {
-      method: "POST", body: JSON.stringify(payload),
-      headers: {"Content-Type":"application/json"}
+      method: "POST",
+      mode:   "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
     });
-  } catch(e) { console.warn("Erro ao enviar:", e); }
+  } catch(e) { console.warn("Erro na ação POST:", payload.action, e); }
+  return null;
 }
 
 // ── Filtros
