@@ -482,8 +482,9 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="msg-erro" id="erro-coord">Informe seu nome.</div>
       </div>
       <div class="campo-grupo">
-        <label for="num-reservas">Nº de reservas escalados neste turno <span class="req">*</span></label>
-        <input type="text" id="num-reservas" placeholder="Ex: 8" inputmode="numeric">
+        <label for="num-reservas">Nº de acionamentos previstos neste turno <span class="req">*</span></label>
+        <div class="hint">Quantidade estimada de vagas que precisarão de cobertura (vagas em aberto + possíveis faltas)</div>
+        <input type="text" id="num-reservas" placeholder="Ex: 5" inputmode="numeric">
         <div class="msg-erro" id="erro-reservas">Informe o número.</div>
       </div>
     </div>
@@ -509,12 +510,17 @@ textarea { resize: vertical; min-height: 72px; }
   </div>
 
   <!-- Vagas previstas para este turno -->
-  <div id="bloco-vagas-previstas" style="display:none;margin-bottom:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--texto);margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-      📋 Vagas previstas neste turno
-      <span style="font-size:11px;font-weight:400;color:var(--cinza-4);">Confirme ou descarte cada uma</span>
+  <div id="bloco-vagas-previstas" style="display:none;margin-bottom:20px;">
+    <div style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;">
+      <div style="background:var(--verde-dark);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:white;">📋 Acionamentos previstos neste turno</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;">Vagas em aberto (LM, VAGO, disciplinar) · Confirme ou descarte cada uma</div>
+        </div>
+        <span id="badge-previstas" style="background:rgba(255,255,255,.2);color:white;font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px;">0 vagas</span>
+      </div>
+      <div id="lista-vagas-previstas" style="padding:4px 0;"></div>
     </div>
-    <div id="lista-vagas-previstas"></div>
   </div>
 
   <div class="contador-bar">
@@ -540,6 +546,39 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="spinner"></div>
     <span class="btn-txt">Concluir turno e enviar relatório</span>
   </button>
+</div>
+
+<!-- ════ MINI-MODAL: REGISTRAR VAGA PREVISTA ════ -->
+<div id="mini-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:var(--r-xl);padding:26px;width:min(420px,95vw);box-shadow:0 8px 40px rgba(0,0,0,.25);">
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Registrar acionamento</div>
+      <div style="font-size:16px;font-weight:700;color:var(--verde-dark);" id="mini-modal-titulo">—</div>
+      <div style="font-size:13px;color:var(--cinza-4);" id="mini-modal-subtitulo">—</div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px;">
+        Reserva que cobriu <span style="color:var(--erro)">*</span>
+      </label>
+      <div class="hint" id="mini-hint-reserva" style="margin-bottom:6px;"></div>
+      <select id="mini-reserva-sel" onchange="miniReservaSelChange()" style="width:100%;padding:10px 12px;border:1.5px solid var(--cinza-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:6px;">
+        <option value="">— Selecione o reserva escalado —</option>
+      </select>
+      <input type="text" id="mini-reserva-txt" placeholder="Ou digite o nome se não estiver na lista" style="width:100%;padding:10px 12px;border:1.5px solid var(--cinza-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:14px;">
+      <div id="mini-erro-reserva" style="display:none;color:var(--erro);font-size:12px;margin-top:4px;">Informe o reserva acionado.</div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px;">Observações</label>
+      <input type="text" id="mini-obs" placeholder="Opcional" style="width:100%;padding:10px 12px;border:1.5px solid var(--cinza-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:14px;">
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button onclick="miniFechar()" style="flex:1;background:var(--cinza-0);color:var(--cinza-4);border:1.5px solid var(--cinza-2);border-radius:var(--r);padding:11px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;">Cancelar</button>
+      <button onclick="miniSalvar()" style="flex:2;background:var(--verde);color:white;border:none;border-radius:var(--r);padding:11px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;">✓ Confirmar acionamento</button>
+    </div>
+  </div>
 </div>
 
 <!-- ════ MODAL: ADICIONAR / CONFIRMAR ACIONAMENTO ════ -->
@@ -1076,96 +1115,166 @@ async function carregarVagasPrevistas() {
   try {
     const resp = await fetch(APPS_SCRIPT_URL + "?action=listarVagas");
     const json = await resp.json();
-    if (json.ok && json.dados) vagasSheets = json.dados.filter(v => v.status !== "Deletada");
-  } catch(e) { console.warn("Vagas do Sheets indisponíveis, usando apenas fixas"); }
+    if (json.ok && json.dados) vagasSheets = json.dados.filter(v => v.status !== "Deletada" && v.status !== "Preenchida");
+  } catch(e) { console.warn("Vagas do Sheets indisponíveis"); }
 
-  // Combina fixas (LMs) com as do Sheets (estruturais)
+  // Fixas (LMs/disciplinar)
   const fixas = ESCALA_FIXOS.filter(v => v.dia === dia && v.turno === turnoKey);
 
-  // Converte vagas do Sheets para o formato da escala
+  // Estruturais do Sheets para este dia/turno
   const vagasDoSheets = vagasSheets
     .filter(v => v.dias && v.dias.includes(dia))
-    .filter(v => {
-      const tk = (v.turno || "").includes("Noturno") ? "N" : "D";
-      return tk === turnoKey;
-    })
+    .filter(v => { const tk = (v.turno||"").includes("Noturno") ? "N" : "D"; return tk === turnoKey; })
     .map(v => ({
       dia, turno: turnoKey,
-      hospital: v.hospital,
-      slot: v.slot,
+      hospital: v.hospital, slot: v.slot,
       plantonista: v.plantonista || "—",
       tipo: v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago",
-      quinzena: v.quinzena || null,
-      retorno: v.retorno || "—",
-      status: v.status,
-      id: v.id,
-    }))
-    .filter(v => v.status !== "Preenchida"); // não mostra vagas já preenchidas
+      quinzena: v.quinzena || null, retorno: v.retorno || "—",
+      status: v.status, id: v.id,
+    }));
 
-  const previstas = [...fixas, ...vagasDoSheets];
+  window._vagasPrevistas = [...fixas, ...vagasDoSheets];
+  const previstas = window._vagasPrevistas;
 
   const bloco = document.getElementById("bloco-vagas-previstas");
   const lista  = document.getElementById("lista-vagas-previstas");
+  const badge  = document.getElementById("badge-previstas");
 
   if (previstas.length === 0) { bloco.style.display = "none"; return; }
   bloco.style.display = "block";
+  badge.textContent = previstas.length + " vaga" + (previstas.length > 1 ? "s" : "");
 
   lista.innerHTML = previstas.map((v, i) => {
     const tagCor = v.tipo === "disciplinar"
       ? "background:var(--erro-bg);color:var(--erro)"
-      : v.tipo === "lm"
-      ? "background:var(--amarelo-bg);color:var(--amarelo)"
-      : v.tipo === "quinzenal"
-      ? "background:var(--info-bg);color:var(--info)"
+      : v.tipo === "lm" ? "background:var(--amarelo-bg);color:var(--amarelo)"
+      : v.tipo === "quinzenal" ? "background:var(--info-bg);color:var(--info)"
       : "background:var(--verde-light);color:var(--verde)";
-    const tagTxt = v.tipo === "disciplinar" ? "Disc."
-      : v.tipo === "lm" ? "LM"
-      : v.tipo === "quinzenal" ? (v.quinzena ? "Q"+v.quinzena : "Quinz.")
-      : "Vago";
+    const tagTxt = v.tipo === "disciplinar" ? "Disc." : v.tipo === "lm" ? "LM"
+      : v.tipo === "quinzenal" ? (v.quinzena ? "Q"+v.quinzena : "Quinz.") : "Vago";
+    const plantonista = v.plantonista && v.plantonista !== "—"
+      ? `<span style="font-size:12px;color:var(--cinza-4);">${v.plantonista}</span>`
+      : `<span style="font-size:12px;color:var(--cinza-3);font-style:italic;">Vaga estrutural em aberto</span>`;
 
-    return `<div id="vaga-prev-${i}" style="display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid var(--cinza-1);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;gap:10px;">
-      <div style="display:flex;align-items:center;gap:10px;flex:1;">
-        <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;${tagCor};white-space:nowrap;">${tagTxt}</span>
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--texto);">${v.hospital} <span style="color:var(--cinza-4);font-weight:400;">— ${v.slot}</span></div>
-          <div style="font-size:12px;color:var(--cinza-4);">${v.plantonista && v.plantonista !== "—" ? v.plantonista : "Vaga em aberto"}</div>
-        </div>
+    return `<div id="vaga-prev-${i}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--cinza-1);">
+      <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;${tagCor};white-space:nowrap;">${tagTxt}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--texto);">${v.hospital} <span style="color:var(--cinza-4);font-weight:400;font-size:12px;">— ${v.slot}</span></div>
+        ${plantonista}
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;">
-        <button onclick="confirmarVagaPrevista(${i})" style="background:var(--verde-light);color:var(--verde);border:1.5px solid var(--verde);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✓ Registrar</button>
-        <button onclick="descartarVagaPrevista(${i})" style="background:var(--cinza-0);color:var(--cinza-4);border:1.5px solid var(--cinza-2);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">✕</button>
+      <div style="display:flex;gap:6px;flex-shrink:0;" id="btns-prev-${i}">
+        <button onclick="miniAbrir(${i})" style="background:var(--verde);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">✓ Registrar</button>
+        <button onclick="descartarVagaPrevista(${i})" style="background:var(--cinza-0);color:var(--cinza-4);border:1.5px solid var(--cinza-2);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;">✕</button>
       </div>
     </div>`;
   }).join("");
 
-  // Popula o select de vagas no modal — usa previstas combinadas
-  window._vagasPrevistas = previstas;
+  // Popula select do modal principal
   const sel = document.getElementById("m-vaga-sel");
-  sel.innerHTML = "<option value=''>— Selecione a vaga —</option>";
-  previstas.forEach((v, i) => {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = `${v.hospital} — ${v.slot} (${v.plantonista && v.plantonista !== "—" ? v.plantonista : "Vaga aberta"})`;
-    sel.appendChild(opt);
-  });
-  const manOpt = document.createElement("option");
-  manOpt.value = "__manual__";
-  manOpt.textContent = "Outra vaga (preencher manualmente)";
-  sel.appendChild(manOpt);
+  if (sel) {
+    sel.innerHTML = "<option value=''>— Selecione a vaga —</option>";
+    previstas.forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v.hospital} — ${v.slot} (${v.plantonista && v.plantonista !== "—" ? v.plantonista : "Vaga aberta"})`;
+      sel.appendChild(opt);
+    });
+    const manOpt = document.createElement("option");
+    manOpt.value = "__manual__";
+    manOpt.textContent = "Outra vaga (preencher manualmente)";
+    sel.appendChild(manOpt);
+  }
 }
 
 function confirmarVagaPrevista(idx) {
-  const dia      = turno.dataBruta ? dataToDia(turno.dataBruta) : null;
-  const turnoKey = turno.tipo && turno.tipo.includes("Diurno") ? "D" : "N";
-  const previstas = ESCALA_FIXOS.filter(v => v.dia === dia && v.turno === turnoKey);
-  const v = previstas[idx];
+  const v = (window._vagasPrevistas || [])[idx];
+  if (!v) return;
+  miniAbrir(idx);
+}
+
+// ── Mini-modal: registro rápido de vaga prevista
+let _miniIdx = -1;
+
+function miniAbrir(idx) {
+  _miniIdx = idx;
+  const v = (window._vagasPrevistas || [])[idx];
   if (!v) return;
 
-  // Abre modal pré-selecionando essa vaga
-  abrirModal();
-  selecionarOrigem("vaga");
-  document.getElementById("m-vaga-sel").value = idx;
-  vagaSelChange();
+  document.getElementById("mini-modal-titulo").textContent    = v.hospital + " — " + v.slot;
+  document.getElementById("mini-modal-subtitulo").textContent = v.plantonista && v.plantonista !== "—"
+    ? "Plantonista ausente: " + v.plantonista
+    : "Vaga estrutural em aberto";
+  document.getElementById("mini-reserva-txt").value = "";
+  document.getElementById("mini-obs").value = "";
+  document.getElementById("mini-erro-reserva").style.display = "none";
+
+  // Popula select de reservas
+  const sel = document.getElementById("mini-reserva-sel");
+  sel.innerHTML = "<option value=''>— Selecione o reserva escalado —</option>";
+  const dia = turno.dataBruta ? dataToDia(turno.dataBruta) : null;
+  const turnoKey = turno.tipo && turno.tipo.includes("Diurno") ? "D" : "N";
+  if (dia && turnoKey) {
+    const reservas = RESERVAS_ESCALA.filter(r => r.dia === dia && r.turno === turnoKey).sort((a,b) => a.ordem - b.ordem);
+    reservas.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.nome;
+      opt.textContent = `${r.ordem}° — ${r.nome}`;
+      sel.appendChild(opt);
+    });
+    sel.innerHTML += "<option value='__outro__'>Outro (não está na lista)</option>";
+    const hint = document.getElementById("mini-hint-reserva");
+    if (hint) hint.textContent = `${reservas.length} reserva(s) escalado(s) para ${dia} ${turnoKey === "D" ? "Diurno" : "Noturno"}`;
+  }
+
+  document.getElementById("mini-modal-overlay").style.display = "flex";
+}
+
+function miniReservaSelChange() {
+  const sel = document.getElementById("mini-reserva-sel");
+  const txt = document.getElementById("mini-reserva-txt");
+  if (sel.value === "__outro__") { txt.value = ""; txt.focus(); }
+  else if (sel.value) txt.value = sel.value;
+}
+
+function miniFechar() {
+  document.getElementById("mini-modal-overlay").style.display = "none";
+  _miniIdx = -1;
+}
+
+function miniSalvar() {
+  const sel      = document.getElementById("mini-reserva-sel");
+  const reserva  = document.getElementById("mini-reserva-txt").value.trim() || (sel.value !== "__outro__" ? sel.value : "");
+  const errEl    = document.getElementById("mini-erro-reserva");
+
+  if (!reserva) { errEl.style.display = "block"; return; }
+  errEl.style.display = "none";
+
+  const v = (window._vagasPrevistas || [])[_miniIdx];
+  const acion = {
+    origem:          "vaga",
+    hospital:        v ? v.hospital : "—",
+    setor:           v ? v.slot : "",
+    motivo:          "Vaga em aberto (" + (v ? (v.tipo === "lm" ? "LM" : v.tipo === "disciplinar" ? "Disciplinar" : "VAGO") : "—") + ")",
+    plantonistaSaiu: v && v.plantonista && v.plantonista !== "—" ? v.plantonista : "— (vaga estrutural)",
+    reservaAcionado: reserva,
+    status:          "confirmado",
+    obs:             document.getElementById("mini-obs").value.trim(),
+    tipo:            "vaga_aberta",
+    horario:         horaAtual(),
+  };
+
+  acionamentos.push(acion);
+  renderizarLista();
+  miniFechar();
+
+  // Marca a vaga prevista como registrada
+  const el = document.getElementById("vaga-prev-" + _miniIdx);
+  if (el) {
+    const btns = document.getElementById("btns-prev-" + _miniIdx);
+    if (btns) btns.innerHTML = `<span style="font-size:12px;font-weight:600;color:var(--verde);padding:4px 10px;background:var(--verde-light);border-radius:8px;">✓ ${reserva}</span>`;
+    el.style.opacity = "0.6";
+  }
 }
 
 function descartarVagaPrevista(idx) {
@@ -1551,43 +1660,71 @@ async function concluirTurno() {
   const agora = new Date();
   const dataHoraFecho = `${pad(agora.getDate())}/${pad(agora.getMonth()+1)}/${agora.getFullYear()} às ${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
 
+  // Gera protocolo do turno
+  const protTurno = `TU-${agora.getFullYear()}${pad(agora.getMonth()+1)}${pad(agora.getDate())}-${pad(agora.getHours())}${pad(agora.getMinutes())}${pad(agora.getSeconds())}`;
+
   const payload = {
     action:        "registrarTurno",
     turno,
+    protocolo:     protTurno,
     acionamentos,
     obsTurno:      document.getElementById("obs-turno-geral").value.trim(),
     dataHoraFecho,
-    totalAcionamentos:  acionamentos.length,
-    totalConfirmados:   acionamentos.filter(a=>a.status==="confirmado").length,
-    totalRecusados:     acionamentos.filter(a=>a.status==="recusado").length,
-    totalFormulario:    acionamentos.filter(a=>a.tipo==="formulario").length,
-    totalManual:        acionamentos.filter(a=>a.tipo==="manual").length,
+    totalAcionamentos: acionamentos.length,
+    totalConfirmados:  acionamentos.filter(a=>a.status==="confirmado").length,
+    totalRecusados:    acionamentos.filter(a=>a.status==="recusado").length,
+    totalVagasAbertas: acionamentos.filter(a=>a.origem==="vaga").length,
+    totalFaltas:       acionamentos.filter(a=>a.origem==="falta").length,
   };
 
   try {
-    if (APPS_SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbwdk5iX6-9vJd9q2k58P5ao0tGbVwPUTRIMyuOFVMzRYYXs5e_8-CwzfUG11d5mFkqx/exec") {
-      await fetch(APPS_SCRIPT_URL, {
-        method: "POST", body: JSON.stringify(payload),
-        headers: {"Content-Type":"application/json"}
-      });
-    }
+    await fetch(APPS_SCRIPT_URL, {
+      method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(payload)
+    });
   } catch(err) { console.warn("Apps Script indisponível:", err); }
 
-  // Tela de conclusão
-  document.getElementById("res-total").textContent      = payload.totalAcionamentos;
-  document.getElementById("res-confirmados").textContent= payload.totalConfirmados;
-  document.getElementById("res-recusados").textContent  = payload.totalRecusados;
+  // ── Preenche comprovante
+  document.getElementById("comp-protocolo").textContent = protTurno;
+  document.getElementById("comp-data").textContent = turno.data || "—";
+  document.getElementById("comp-hora").textContent  = "Fechado em " + dataHoraFecho;
+  document.getElementById("comp-coord").textContent = turno.coord || "—";
+  document.getElementById("comp-turno").textContent = turno.tipo  || "—";
+  document.getElementById("comp-total").textContent = payload.totalAcionamentos;
+  document.getElementById("comp-conf").textContent  = payload.totalConfirmados;
+  document.getElementById("comp-recus").textContent = payload.totalRecusados;
 
-  document.getElementById("resumo-lista").innerHTML = acionamentos.length
-    ? `<div style="font-size:13px; border-top:1px solid var(--cinza-1); padding-top:14px; margin-top:4px;">` +
-      acionamentos.map((a,i) =>
-        `<div style="padding:8px 0; border-bottom:1px solid var(--cinza-1); display:flex; gap:10px; align-items:center;">
-          <span style="background:${a.status==='confirmado'?'#dcfce7':'#fef2f2'};color:${a.status==='confirmado'?'#166534':'var(--erro)'};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;">${a.status==='confirmado'?'✓':'✕'}</span>
-          <div style="flex:1"><strong>${a.plantonistaSaiu}</strong> → ${a.reservaAcionado}<br><span style="color:var(--cinza-4);font-size:12px;">${a.hospital} · ${a.motivo}</span></div>
-        </div>`
-      ).join("") + `</div>`
-    : "";
+  // Lista detalhada no comprovante
+  document.getElementById("comp-lista").innerHTML = acionamentos.length === 0
+    ? `<div style="color:var(--cinza-4);font-size:13px;text-align:center;padding:12px 0;">Nenhum acionamento registrado neste turno.</div>`
+    : acionamentos.map((a, i) => {
+        const isVaga = a.origem === "vaga";
+        const statusCor = a.status === "confirmado" ? "#166534" : "var(--erro)";
+        const statusBg  = a.status === "confirmado" ? "#dcfce7" : "#fef2f2";
+        const statusSig = a.status === "confirmado" ? "✓ Confirmado" : "✕ Recusado";
+        return `<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--cinza-1);align-items:flex-start;">
+          <span style="min-width:22px;height:22px;border-radius:50%;background:var(--verde-dark);color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">${i+1}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--texto);">${a.hospital}${a.setor ? " / " + a.setor : ""}</div>
+            <div style="font-size:12px;color:var(--cinza-4);">${a.motivo}</div>
+            ${!isVaga && a.plantonistaSaiu && a.plantonistaSaiu !== "— (vaga estrutural)" ? `<div style="font-size:12px;color:var(--cinza-4);">Saiu: ${a.plantonistaSaiu}</div>` : ""}
+            <div style="font-size:12px;color:var(--texto);font-weight:500;">Reserva: ${a.reservaAcionado} · ${a.horario}</div>
+            ${a.obs ? `<div style="font-size:11px;color:var(--cinza-4);font-style:italic;">${a.obs}</div>` : ""}
+          </div>
+          <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:${statusBg};color:${statusCor};white-space:nowrap;flex-shrink:0;">${statusSig}</span>
+        </div>`;
+      }).join("");
 
+  // Observações no comprovante
+  if (payload.obsTurno) {
+    document.getElementById("comp-lista").innerHTML += `
+      <div style="margin-top:12px;padding:10px 12px;background:var(--cinza-0);border-radius:var(--r);font-size:13px;color:var(--texto);">
+        <strong>Observações do turno:</strong> ${payload.obsTurno}
+      </div>`;
+  }
+
+  // ── Telas
   document.getElementById("tela-turno").classList.remove("vis");
   document.getElementById("tela-conclusao").classList.add("vis");
   document.getElementById("turno-badge").classList.remove("vis");
