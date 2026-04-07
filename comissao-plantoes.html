@@ -528,10 +528,37 @@ body {
           <input id="lm-f-retorno-disc" type="text" placeholder="Ex: 03/06/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
         </div>
       </div>
-      <!-- Plantões afetados -->
+      <!-- Campos estruturados de plantão → vão direto para a Escala Semanal -->
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Plantões afetados</label>
-        <textarea id="lm-f-plantoes" rows="2" placeholder="Ex: HAM Hemio Seg diurno, 1° Reserva Qui diurno…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;"></textarea>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Hospital / Serviço <span style="color:var(--erro)">*</span></label>
+        <input id="lm-f-hospital" type="text" placeholder="Ex: HAM — Hemodinâmica, IMIP Maternidade…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Slot / Descrição da vaga <span style="color:var(--erro)">*</span></label>
+        <input id="lm-f-slot" type="text" placeholder="Ex: 1° Reserva diurno, 12h Hemio, COB Sáb noturno…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Dias da semana afetados <span style="color:var(--erro)">*</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;" id="lm-f-dias-wrap">
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Seg"> Seg</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Ter"> Ter</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Qua"> Qua</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Qui"> Qui</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Sex"> Sex</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Sáb"> Sáb</label>
+          <label class="ap-dia-label"><input type="checkbox" name="lm-dia" value="Dom"> Dom</label>
+        </div>
+        <div id="lm-f-erro-dias" style="display:none;color:var(--erro);font-size:12px;margin-top:4px;">Selecione ao menos um dia.</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Turno <span style="color:var(--erro)">*</span></label>
+        <select id="lm-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <option value="">Selecione…</option>
+          <option value="Diurno (07h–19h)">Diurno (07h–19h)</option>
+          <option value="Noturno (19h–07h)">Noturno (19h–07h)</option>
+          <option value="Manhã (07h–13h)">Manhã (07h–13h)</option>
+          <option value="Tarde (13h–19h)">Tarde (13h–19h)</option>
+        </select>
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Observações</label>
@@ -1011,66 +1038,27 @@ async function carregarAvisosPrevios() {
   } catch(e) { /* usa dados locais */ }
 }
 
-// ── Carrega vagas estruturais salvas no Apps Script
-// Substitui completamente as vagas VAGO/quinzenal do Sheets;
-// mantém apenas as LMs/disciplinares que são hardcoded.
+// ── Carrega vagas estruturais 100% do Sheets
 async function vgCarregarVagas() {
-  const LM_IDS = new Set(vagasEstruturais.filter(v => v.tipo === "lm" || v.tipo === "disciplinar").map(v => v.id));
-
   try {
-    const url  = APPS_SCRIPT_URL + "?action=listarVagas";
-    const resp = await fetch(url);
+    const resp = await fetch(APPS_SCRIPT_URL + "?action=listarVagas");
     const json = await resp.json();
     if (!json.ok) throw new Error("Resposta inválida");
 
-    // Mantém só as LMs/disciplinares hardcoded, descarta as estruturais antigas
-    vagasEstruturais = vagasEstruturais.filter(v => LM_IDS.has(v.id));
+    // Reconstrói completamente a partir do Sheets
+    vagasEstruturais = json.dados.filter(v => v.status !== "Deletada");
 
-    // Remove entradas estruturais antigas do array da Escala Semanal
-    // (mantém apenas as que são de LM ou disciplinar)
-    const lmTipos = new Set(["lm","disciplinar"]);
-    while (ES_ACIONAMENTOS_FIXOS.length > 0 && !lmTipos.has(ES_ACIONAMENTOS_FIXOS[ES_ACIONAMENTOS_FIXOS.length-1].tipo)) {
-      ES_ACIONAMENTOS_FIXOS.pop();
-    }
-    // Reconstrói a partir do início — remove todas as não-LM
-    for (let i = ES_ACIONAMENTOS_FIXOS.length - 1; i >= 0; i--) {
-      if (!lmTipos.has(ES_ACIONAMENTOS_FIXOS[i].tipo)) ES_ACIONAMENTOS_FIXOS.splice(i, 1);
-    }
-
-    // Adiciona as vagas do Sheets
-    json.dados.forEach(v => {
-      if (v.status === "Deletada") return;
-      vagasEstruturais.push(v);
-
-      if (v.dias && Array.isArray(v.dias)) {
-        const turnoKey = (v.turno || "").includes("Noturno") ? "N" : "D";
-        const tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
-        v.dias.forEach(dia => {
-          ES_ACIONAMENTOS_FIXOS.push({
-            dia, turno: turnoKey,
-            hospital:    v.hospital,
-            slot:        v.slot,
-            plantonista: v.plantonista || "—",
-            tipo:        tipoEscala,
-            quinzena:    v.quinzena || null,
-            retorno:     v.retorno || "—",
-          });
-        });
-      }
-    });
-
-    // Atualiza vgProxId para não conflitar com IDs do Sheets
-    const maxNum = json.dados.reduce((max, v) => {
-      const n = parseInt((v.id || "VG0").replace("VG","")) || 0;
+    // Recalcula próximo ID
+    const maxNum = vagasEstruturais.reduce((max, v) => {
+      const n = parseInt((v.id || "VG0").replace(/\D/g, "")) || 0;
       return Math.max(max, n);
     }, 200);
     vgProxId = maxNum + 1;
 
     atualizarBadge();
     vgRender();
-    esRender();
   } catch(e) {
-    console.warn("Vagas do Sheets indisponíveis, usando apenas dados pré-carregados:", e);
+    console.warn("Vagas do Sheets indisponíveis:", e);
   }
 }
 
@@ -1404,29 +1392,7 @@ function atualizarBadge() {
 // ════ VAGAS ESTRUTURAIS ════
 // Vagas pré-carregadas: apenas LM e afastamentos confirmados
 // Vagas estruturais (VAGO) devem ser adicionadas manualmente pela Comissão
-let vagasEstruturais = [
-  // ── AFASTAMENTO DISCIPLINAR
-  { id:"VG001", hospital:"HAM — Hemodinâmica", slot:"Segunda diurno 12h",    turno:"Diurno",  tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
-  { id:"VG002", hospital:"Reservas",           slot:"8° Reserva — Qua diurno", turno:"Diurno", tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
-  { id:"VG003", hospital:"HAM",                slot:"COB — Sáb noturno",     turno:"Noturno", tipo:"disciplinar", plantonista:"Mariana Parahyba", retorno:"03/06/2026", status:"Reserva", voluntario:"", obs:"Afastamento disciplinar 90d desde 05/03" },
-  // ── LICENÇAS MATERNIDADE
-  { id:"VG004", hospital:"IMIP / SR Oscar",    slot:"Qui diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Rafaella Guedes",     retorno:"12/04/2026", status:"Reserva", voluntario:"", obs:"LM até 12/04" },
-  { id:"VG005", hospital:"Reservas",           slot:"1° Reserva — Seg diurno", turno:"Diurno", tipo:"lm", plantonista:"Rafaella Guedes",    retorno:"12/04/2026", status:"Reserva", voluntario:"", obs:"LM até 12/04" },
-  { id:"VG006", hospital:"IMIP Maternidade",   slot:"COB — Seg diurno",      turno:"Diurno",  tipo:"lm", plantonista:"Elisa Serra",         retorno:"17/04/2026", status:"Reserva", voluntario:"", obs:"LM até 17/04" },
-  { id:"VG007", hospital:"IMIP Maternidade",   slot:"COB — Ter noturno",     turno:"Noturno", tipo:"lm", plantonista:"Elisa Serra",         retorno:"17/04/2026", status:"Reserva", voluntario:"", obs:"LM até 17/04" },
-  { id:"VG008", hospital:"HBL",                slot:"Sáb noturno",           turno:"Noturno", tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
-  { id:"VG009", hospital:"HGV",                slot:"Ter diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
-  { id:"VG010", hospital:"HBL",                slot:"Qua diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Marcela Reis",        retorno:"Em aberto",  status:"Reserva", voluntario:"", obs:"LM desde 21/02" },
-  { id:"VG011", hospital:"HMA",                slot:"Qua diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
-  { id:"VG012", hospital:"Reservas",           slot:"2° Reserva — Sex diurno", turno:"Diurno", tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
-  { id:"VG013", hospital:"Reservas",           slot:"2° Reserva — Dom diurno", turno:"Diurno", tipo:"lm", plantonista:"Valentina Cerqueira", retorno:"13/04/2026", status:"Reserva", voluntario:"", obs:"LM até 13/04" },
-  { id:"VG014", hospital:"Reservas",           slot:"7° Reserva — Qui diurno", turno:"Diurno", tipo:"lm", plantonista:"Larissa Tavares",    retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
-  { id:"VG015", hospital:"CISAM",              slot:"Sex diurno",            turno:"Diurno",  tipo:"lm", plantonista:"Larissa Tavares",     retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
-  { id:"VG016", hospital:"HR — Imagem TC",     slot:"Sex noturno",           turno:"Noturno", tipo:"lm", plantonista:"Larissa Tavares",     retorno:"Afastada",   status:"Reserva", voluntario:"", obs:"Afastada — data de retorno não informada" },
-  { id:"VG017", hospital:"HOF",                slot:"Sex noturno",           turno:"Noturno", tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
-  { id:"VG018", hospital:"HAM",                slot:"3° PL — Ter diurno",   turno:"Diurno",  tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
-  { id:"VG019", hospital:"HAM",                slot:"3° PL — Qua diurno",   turno:"Diurno",  tipo:"lm", plantonista:"Larissa Bezerra",     retorno:"14/06/2026", status:"Reserva", voluntario:"", obs:"LM até 14/06" },
-];
+let vagasEstruturais = [];
 
 let vgFiltro = "todos";
 
@@ -1652,34 +1618,7 @@ function vgSalvarVaga() {
 // ════ ESCALA SEMANAL ════
 // Acionamentos fixos derivados das vagas em aberto (LMs + disciplinar)
 // Organizados por dia da semana e turno
-const ES_ACIONAMENTOS_FIXOS = [
-  // SEGUNDA
-  { dia:"Seg", turno:"D", hospital:"HAM — Hemodinâmica",  slot:"12h diurno",         plantonista:"Mariana Parahyba", tipo:"disciplinar", retorno:"03/06" },
-  { dia:"Seg", turno:"D", hospital:"Reservas",            slot:"1° Reserva diurno",  plantonista:"Rafaella Guedes",  tipo:"lm",          retorno:"12/04" },
-  { dia:"Seg", turno:"D", hospital:"IMIP Maternidade",    slot:"COB diurno",          plantonista:"Elisa Serra",      tipo:"lm",          retorno:"17/04" },
-  // TERÇA
-  { dia:"Ter", turno:"D", hospital:"HGV",                 slot:"diurno",              plantonista:"Marcela Reis",     tipo:"lm",          retorno:"Em aberto" },
-  { dia:"Ter", turno:"D", hospital:"HAM",                 slot:"3° PL diurno",        plantonista:"Larissa Bezerra",  tipo:"lm",          retorno:"14/06" },
-  { dia:"Ter", turno:"N", hospital:"IMIP Maternidade",    slot:"COB noturno",         plantonista:"Elisa Serra",      tipo:"lm",          retorno:"17/04" },
-  // QUARTA
-  { dia:"Qua", turno:"D", hospital:"HAM — Hemodinâmica",  slot:"8° Reserva diurno",  plantonista:"Mariana Parahyba", tipo:"disciplinar", retorno:"03/06" },
-  { dia:"Qua", turno:"D", hospital:"HBL",                 slot:"diurno COB",          plantonista:"Marcela Reis",     tipo:"lm",          retorno:"Em aberto" },
-  { dia:"Qua", turno:"D", hospital:"HMA",                 slot:"diurno",              plantonista:"Valentina Cerqueira", tipo:"lm",       retorno:"13/04" },
-  { dia:"Qua", turno:"D", hospital:"HAM",                 slot:"3° PL diurno",        plantonista:"Larissa Bezerra",  tipo:"lm",          retorno:"14/06" },
-  // QUINTA
-  { dia:"Qui", turno:"D", hospital:"IMIP / SR Oscar",     slot:"diurno",              plantonista:"Rafaella Guedes",  tipo:"lm",          retorno:"12/04" },
-  { dia:"Qui", turno:"D", hospital:"Reservas",            slot:"7° Reserva diurno",   plantonista:"Larissa Tavares",  tipo:"lm",          retorno:"Afastada" },
-  // SEXTA
-  { dia:"Sex", turno:"D", hospital:"Reservas",            slot:"2° Reserva diurno",   plantonista:"Valentina Cerqueira", tipo:"lm",       retorno:"13/04" },
-  { dia:"Sex", turno:"D", hospital:"Maternidade CISAM",   slot:"diurno",              plantonista:"Larissa Tavares",  tipo:"lm",          retorno:"Afastada" },
-  { dia:"Sex", turno:"N", hospital:"HR — Imagem TC",      slot:"noturno",             plantonista:"Larissa Tavares",  tipo:"lm",          retorno:"Afastada" },
-  { dia:"Sex", turno:"N", hospital:"HOF",                 slot:"noturno",             plantonista:"Larissa Bezerra",  tipo:"lm",          retorno:"14/06" },
-  // SÁBADO
-  { dia:"Sáb", turno:"N", hospital:"HBL",                 slot:"noturno COB",         plantonista:"Marcela Reis",     tipo:"lm",          retorno:"Em aberto" },
-  { dia:"Sáb", turno:"N", hospital:"HAM",                 slot:"COB noturno",         plantonista:"Mariana Parahyba", tipo:"disciplinar", retorno:"03/06" },
-  // DOMINGO
-  { dia:"Dom", turno:"D", hospital:"Reservas",            slot:"2° Reserva diurno",   plantonista:"Valentina Cerqueira", tipo:"lm",       retorno:"13/04" },
-];
+const ES_ACIONAMENTOS_FIXOS = [];
 
 // Reposições manuais (alimentadas pelo usuário + buscadas do Apps Script)
 let esReposicoes = [];
@@ -1776,10 +1715,63 @@ function esRender() {
     { key:"N", label:"Noturno — 19h às 07h" }
   ];
 
-  // Renderiza lista de reposições
+  // ── Constrói entradas da escala em tempo real a partir das fontes do Sheets
+
+  // Fonte 1: Licenças ativas (LM, gestacional, disciplinar, saúde)
+  const entradasLicencas = [];
+  licencasAtivas
+    .filter(l => l.status === "Ativa" && l.dias && Array.isArray(l.dias))
+    .forEach(lm => {
+      const tipoEscala = lm.tipo === "gestacional" ? "gestacional"
+                       : lm.tipo === "disciplinar"  ? "disciplinar"
+                       : lm.tipo === "saude"         ? "saude"
+                       : "lm";
+      lm.dias.forEach(dia => {
+        const turnos = lm.tipo === "gestacional"
+          ? ["N"]
+          : lm.turno
+            ? [(lm.turno.toLowerCase().includes("noturno") ? "N" : "D")]
+            : ["D"];
+        turnos.forEach(turnoKey => {
+          entradasLicencas.push({
+            dia, turno: turnoKey,
+            hospital:    lm.hospital || lm.slot || "—",
+            slot:        lm.slot     || "—",
+            plantonista: lm.nome,
+            tipo:        tipoEscala,
+            retorno:     lm.retorno  || "Em aberto",
+          });
+        });
+      });
+    });
+
+  // Fonte 2: Vagas estruturais (VAGO, quinzenal, etc.) do Sheets
+  const entradasVagas = [];
+  vagasEstruturais
+    .filter(v => v.status !== "Deletada" && v.status !== "Preenchida" && v.dias && Array.isArray(v.dias))
+    .forEach(v => {
+      const turnoKey   = (v.turno || "").toLowerCase().includes("noturno") ? "N" : "D";
+      const tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
+      v.dias.forEach(dia => {
+        entradasVagas.push({
+          dia, turno: turnoKey,
+          hospital:    v.hospital,
+          slot:        v.slot     || "—",
+          plantonista: v.plantonista || "—",
+          tipo:        tipoEscala,
+          quinzena:    v.quinzena || null,
+          retorno:     v.retorno  || "—",
+        });
+      });
+    });
+
+  // Une tudo — licenças primeiro, depois vagas estruturais
+  const todasEntradas = [...entradasLicencas, ...entradasVagas];
+
+  // ── Renderiza lista de reposições
   const repLista = document.getElementById("es-reposicoes-lista");
   if (esReposicoes.length === 0) {
-    repLista.innerHTML = `<div style="font-size:13px;color:var(--cinza-4);padding:8px 0;">Nenhuma reposição agendada. Adicione manualmente ou as pendências do sistema aparecerão automaticamente.</div>`;
+    repLista.innerHTML = `<div style="font-size:13px;color:var(--cinza-4);padding:8px 0;">Nenhuma reposição agendada. As reposições dos acionamentos aparecem aqui automaticamente.</div>`;
   } else {
     repLista.innerHTML = esReposicoes.map(r => {
       const dia = esDiaSemana(r.dataRep);
@@ -1797,11 +1789,11 @@ function esRender() {
     }).join("");
   }
 
-  // Renderiza calendário
+  // ── Renderiza calendário
   const cal = document.getElementById("es-calendario");
   cal.innerHTML = DIAS.map(dia => {
     return TURNOS.map(turno => {
-      const fixos = ES_ACIONAMENTOS_FIXOS.filter(a => a.dia === dia && a.turno === turno.key);
+      const fixos = todasEntradas.filter(a => a.dia === dia && a.turno === turno.key);
       const reps  = esReposicoes.filter(r => {
         const d = esDiaSemana(r.dataRep);
         const t = r.turnoRep && r.turnoRep.toLowerCase().includes("diurno") ? "D" : "N";
@@ -1811,7 +1803,6 @@ function esRender() {
       if (fixos.length === 0 && reps.length === 0) return "";
 
       const totalAcionamentos = fixos.length;
-      const totalReps = reps.length;
       const pressaoCor = totalAcionamentos >= 4 ? "var(--erro)"
                        : totalAcionamentos >= 3 ? "var(--alerta)"
                        : totalAcionamentos >= 2 ? "#eab308"
@@ -1907,29 +1898,7 @@ function esRender() {
 
 // ════ LICENÇAS / LM ════
 // Dados iniciais: LMs e afastamentos reais de 2026
-let licencasAtivas = [
-  { id:"LM001", nome:"Mariana Parahyba", tipo:"disciplinar", inicio:"05/03/2026", retorno:"03/06/2026", duracao:90,
-    plantoes:"HAM Hemio Seg diurno, 8° Reserva Qua diurno, COB HAM Sáb noturno",
-    obs:"Afastamento disciplinar 90d", status:"Ativa" },
-  { id:"LM002", nome:"Rafaella Guedes", tipo:"lm", inicio:"12/01/2026", retorno:"12/05/2026", duracao:120,
-    plantoes:"IMIP/SR Oscar Qui diurno, 1° Reserva Seg diurno",
-    obs:"LM 120 dias", status:"Ativa" },
-  { id:"LM003", nome:"Elisa Serra", tipo:"lm", inicio:"18/12/2025", retorno:"17/04/2026", duracao:120,
-    plantoes:"IMIP Mat COB Seg diurno, IMIP Mat COB Ter noturno",
-    obs:"LM 120 dias", status:"Ativa" },
-  { id:"LM004", nome:"Marcela Reis", tipo:"lm", inicio:"—", retorno:"Em aberto", duracao:120,
-    plantoes:"HBL Sáb noturno, HGV Ter diurno, HBL Qua diurno",
-    obs:"Data de início não informada", status:"Ativa" },
-  { id:"LM005", nome:"Valentina Cerqueira", tipo:"lm", inicio:"14/01/2026", retorno:"13/05/2026", duracao:120,
-    plantoes:"HMA Qua diurno, 2° Reserva Sex diurno, 2° Reserva Dom diurno",
-    obs:"LM 120 dias", status:"Ativa" },
-  { id:"LM006", nome:"Larissa Tavares", tipo:"saude", inicio:"—", retorno:"Afastada", duracao:null,
-    plantoes:"7° Reserva Qui diurno, CISAM Sex diurno, HR Imagem TC Sex noturno",
-    obs:"Afastamento sem data de retorno", status:"Ativa" },
-  { id:"LM007", nome:"Larissa Bezerra", tipo:"lm", inicio:"14/12/2025", retorno:"13/04/2026", duracao:120,
-    plantoes:"HOF Sex noturno, HAM 3° PL Ter diurno, HAM 3° PL Qua diurno",
-    obs:"LM 120 dias", status:"Ativa" },
-];
+let licencasAtivas = [];
 
 let lmFiltro = "todos";
 
@@ -2109,20 +2078,19 @@ function lmConverterParaLM(id) {
 
 // Modal nova LM
 function lmAbrirModal() {
-  document.getElementById("lm-f-nome").value      = "";
-  document.getElementById("lm-f-tipo").value      = "";
-  document.getElementById("lm-f-inicio").value    = "";
-  document.getElementById("lm-f-inicio-gest").value = "";
-  document.getElementById("lm-f-inicio-disc").value = "";
-  document.getElementById("lm-f-retorno-disc").value = "";
-  document.getElementById("lm-f-semanas").value   = "";
-  document.getElementById("lm-f-plantoes").value  = "";
-  document.getElementById("lm-f-obs").value       = "";
+  ["lm-f-nome","lm-f-inicio","lm-f-inicio-gest","lm-f-inicio-disc",
+   "lm-f-retorno-disc","lm-f-semanas","lm-f-obs","lm-f-hospital","lm-f-slot"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
+  });
+  document.getElementById("lm-f-tipo").value = "";
+  document.getElementById("lm-f-turno").value = "";
+  document.querySelectorAll('input[name="lm-dia"]').forEach(cb => cb.checked = false);
   document.getElementById("lm-f-fim-preview").textContent = "";
   document.getElementById("lm-f-bloco-lm").style.display   = "none";
   document.getElementById("lm-f-bloco-gest").style.display = "none";
   document.getElementById("lm-f-bloco-disc").style.display = "none";
   document.getElementById("lm-modal-erro").style.display   = "none";
+  document.getElementById("lm-f-erro-dias") && (document.getElementById("lm-f-erro-dias").style.display = "none");
   document.getElementById("lm-modal-overlay").style.display = "flex";
 }
 function lmFecharModal() { document.getElementById("lm-modal-overlay").style.display = "none"; }
@@ -2145,88 +2113,100 @@ function lmCalcFim() {
 }
 
 function lmSalvar() {
-  const nome = document.getElementById("lm-f-nome").value.trim();
-  const tipo = document.getElementById("lm-f-tipo").value;
-  const errEl = document.getElementById("lm-modal-erro");
-  if (!nome || !tipo) {
-    errEl.style.display = "block"; errEl.textContent = "Preencha o nome e o tipo de afastamento."; return;
-  }
-  errEl.style.display = "none";
+  const nome     = document.getElementById("lm-f-nome").value.trim();
+  const tipo     = document.getElementById("lm-f-tipo").value;
+  const hospital = document.getElementById("lm-f-hospital").value.trim();
+  const slot     = document.getElementById("lm-f-slot").value.trim();
+  const turno    = document.getElementById("lm-f-turno").value;
+  const dias     = [...document.querySelectorAll('input[name="lm-dia"]:checked')].map(c => c.value);
+  const errEl    = document.getElementById("lm-modal-erro");
+  const errDias  = document.getElementById("lm-f-erro-dias");
+
+  let valido = true;
+  if (!nome || !tipo) { errEl.style.display = "block"; errEl.textContent = "Preencha o nome e o tipo."; valido = false; }
+  else errEl.style.display = "none";
+  if (dias.length === 0) { if(errDias) errDias.style.display = "block"; valido = false; }
+  else if(errDias) errDias.style.display = "none";
+  if (!valido) return;
+
+  const fmtDate = id => {
+    const v = document.getElementById(id)?.value;
+    if (!v) return "—";
+    const d = new Date(v + "T12:00:00"), p = n => String(n).padStart(2,"0");
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
+  };
 
   let inicio = "—", retorno = "Em aberto", duracao = null;
   if (tipo === "lm") {
-    inicio  = document.getElementById("lm-f-inicio").value || "—";
+    inicio  = fmtDate("lm-f-inicio");
     duracao = 120;
-    if (inicio && inicio !== "—") {
-      const ini = new Date(inicio + "T12:00:00");
+    if (inicio !== "—") {
+      const ini = new Date(document.getElementById("lm-f-inicio").value + "T12:00:00");
       const fim = new Date(ini.getTime() + 120 * 86400000);
-      const p = n => String(n).padStart(2,"0");
-      retorno = `${p(fim.getDate())}/${p(fim.getMonth()+1)}/${fim.getFullYear()}`;
-      // Formata início
-      inicio = `${p(ini.getDate())}/${p(ini.getMonth()+1)}/${ini.getFullYear()}`;
+      const p   = n => String(n).padStart(2,"0");
+      retorno   = `${p(fim.getDate())}/${p(fim.getMonth()+1)}/${fim.getFullYear()}`;
     }
   } else if (tipo === "gestacional") {
-    inicio  = (() => { const v = document.getElementById("lm-f-inicio-gest").value; if (!v) return "—"; const d=new Date(v+"T12:00:00"); const p=n=>String(n).padStart(2,"0"); return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`; })();
+    inicio  = fmtDate("lm-f-inicio-gest");
     retorno = "Até o parto";
   } else {
-    inicio  = (() => { const v = document.getElementById("lm-f-inicio-disc").value; if (!v) return "—"; const d=new Date(v+"T12:00:00"); const p=n=>String(n).padStart(2,"0"); return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`; })();
+    inicio  = fmtDate("lm-f-inicio-disc");
     retorno = document.getElementById("lm-f-retorno-disc").value.trim() || "Em aberto";
   }
 
   const nova = {
-    id:        "LM" + String(Date.now()).slice(-6),
+    id:       "LM" + String(Date.now()).slice(-6),
     nome, tipo, inicio, retorno, duracao,
-    plantoes:  document.getElementById("lm-f-plantoes").value.trim(),
-    obs:       document.getElementById("lm-f-obs").value.trim(),
-    status:    "Ativa",
+    hospital, slot, dias, turno,
+    obs:      document.getElementById("lm-f-obs").value.trim(),
+    status:   "Ativa",
   };
 
   licencasAtivas.push(nova);
-
-  // Popula escala semanal
   lmPopularEscala(nova);
-
   enviarAcao({ action: "registrarLicenca", licenca: nova });
   lmFecharModal();
   atualizarBadge();
   lmRender();
   esRender();
-  mostrarToast(`✓ Licença de ${nome} registrada`);
+  mostrarToast(`✓ Licença de ${nova.nome} registrada`);
 }
 
-// Popula ES_ACIONAMENTOS_FIXOS a partir de uma licença
+// Popula ES_ACIONAMENTOS_FIXOS a partir de uma licença vinda do Sheets.
+// A licença deve ter os campos: dias (array), turno, hospital, slot, plantonista, tipo, retorno.
+// Esta é a ÚNICA função que escreve em ES_ACIONAMENTOS_FIXOS.
 function lmPopularEscala(lm) {
-  if (!lm.plantoes) return;
-  const DIAS_SEMANA = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  if (!lm.dias || !Array.isArray(lm.dias) || lm.dias.length === 0) return;
+
   const tipoEscala = lm.tipo === "gestacional" ? "gestacional"
-                   : lm.tipo === "disciplinar" ? "disciplinar" : "lm";
-  const texto = lm.plantoes.toLowerCase();
+                   : lm.tipo === "disciplinar"  ? "disciplinar"
+                   : lm.tipo === "saude"         ? "saude"
+                   : "lm";
 
-  DIAS_SEMANA.forEach(dia => {
-    const diaLow = dia === "Sáb" ? "sab" : dia.toLowerCase();
-    if (!texto.includes(diaLow) && !texto.includes(dia.toLowerCase())) return;
+  lm.dias.forEach(dia => {
+    // Gestacional: só noturno. Demais: turno salvo na licença.
+    const turnosParaPopular = lm.tipo === "gestacional"
+      ? ["N"]
+      : lm.turno
+        ? [(lm.turno.toLowerCase().includes("noturno") ? "N" : "D")]
+        : ["D"];
 
-    const turnos = [];
-    if (lm.tipo === "gestacional") {
-      turnos.push("N"); // só noturno
-    } else {
-      if (!texto.includes("noturno") || texto.includes("diurno") || texto.includes("manhã") || texto.includes("tarde")) turnos.push("D");
-      if (texto.includes("noturno")) turnos.push("N");
-      if (turnos.length === 0) { turnos.push("D"); turnos.push("N"); }
-    }
-
-    turnos.forEach(turnoKey => {
+    turnosParaPopular.forEach(turnoKey => {
+      // Evita duplicata exata (mesmo plantonista + dia + turno + tipo)
       const jaExiste = ES_ACIONAMENTOS_FIXOS.some(
-        e => e.plantonista === lm.nome && e.dia === dia && e.turno === turnoKey && e.tipo === tipoEscala
+        e => e.plantonista === lm.nome && e.dia === dia
+          && e.turno === turnoKey && e.tipo === tipoEscala
       );
       if (!jaExiste) {
         ES_ACIONAMENTOS_FIXOS.push({
-          dia, turno: turnoKey,
-          hospital:    lm.plantoes.split(",")[0].trim(),
-          slot:        lm.plantoes.split(",").slice(0,2).join(", "),
+          dia,
+          turno:       turnoKey,
+          hospital:    lm.hospital || lm.slot || "—",
+          slot:        lm.slot     || "—",
           plantonista: lm.nome,
           tipo:        tipoEscala,
-          retorno:     lm.retorno || "Em aberto",
+          retorno:     lm.retorno  || "Em aberto",
+          licencaId:   lm.id,       // referência de volta à licença
         });
       }
     });
@@ -2273,37 +2253,31 @@ function lmConverterParaLM(id) {
   mostrarToast(`🍼 LM de ${lm.nome} iniciada — retorno previsto em ${retornoLM}`);
 }
 
-// Ao carregar: busca licenças salvas no Apps Script e semeia as pré-carregadas
+// Ao carregar: busca licenças salvas no Apps Script.
+// As licenças pré-carregadas (LM001–LM007) já estão no ES_ACIONAMENTOS_FIXOS hardcoded —
+// NÃO chamamos lmPopularEscala para elas, pois causaria duplicatas.
+// ── Carrega licenças 100% do Sheets e reconstrói ES_ACIONAMENTOS_FIXOS
 async function lmCarregarLicencas() {
-  // Primeiro: popula escala semanal com as licenças pré-carregadas no HTML
-  licencasAtivas.filter(l => l.status === "Ativa").forEach(lm => lmPopularEscala(lm));
-
   try {
     const resp = await fetch(APPS_SCRIPT_URL + "?action=listarLicencas");
     const json = await resp.json();
-    if (json.ok && json.dados && json.dados.length > 0) {
-      const idsExist = new Set(licencasAtivas.map(l => l.id));
-      json.dados.forEach(l => {
-        if (!idsExist.has(l.id)) {
-          licencasAtivas.push(l);
-          if (l.status === "Ativa") lmPopularEscala(l);
-        } else {
-          // Atualiza retorno e status das pré-carregadas com o valor do Sheets
-          const local = licencasAtivas.find(x => x.id === l.id);
-          if (local) {
-            local.retorno = l.retorno || local.retorno;
-            local.status  = l.status  || local.status;
-          }
-        }
-      });
-      atualizarBadge();
-    } else {
-      // Planilha vazia: semeia todas as pré-carregadas
-      licencasAtivas.filter(l => l.status === "Ativa").forEach(lm => {
-        enviarAcao({ action: "registrarLicenca", licenca: lm });
-      });
-    }
-  } catch(e) { /* usa dados pré-carregados */ }
+    if (!json.ok) throw new Error("Resposta inválida");
+
+    // Reconstrói completamente a partir do Sheets
+    licencasAtivas = json.dados || [];
+
+    // Reconstrói ES_ACIONAMENTOS_FIXOS a partir das licenças ativas
+    // Limpa e repopula — única fonte de verdade
+    ES_ACIONAMENTOS_FIXOS.length = 0;
+    licencasAtivas
+      .filter(l => l.status === "Ativa")
+      .forEach(lm => lmPopularEscala(lm));
+
+    atualizarBadge();
+    lmRender();
+  } catch(e) {
+    console.warn("Licenças do Sheets indisponíveis:", e);
+  }
 }
 
 // Quando aviso prévio vence → criar vaga estrutural automaticamente
@@ -2341,28 +2315,7 @@ function apVerificarVencimentos() {
 }
 
 // ════ AVISOS PRÉVIOS ════
-let avisosPrevios = [
-  { protocolo:"AP-20260115-091200", nome:"Rodrigo Salzano", crm:"CRM-PE 18234",
-    hospital:"Hospital da Restauração — Urgência (HR)", turno:"Noturno (19h–07h)",
-    diasSemana:"Segunda e Quarta", dataInicio:"15/01/2026", prazoDias:90,
-    dataVencimento:"15/04/2026", dataVencISO: new Date(Date.now()+5*86400000).toISOString(),
-    motivoSaida:"Assumiu concurso público", status:"Ativo" },
-  { protocolo:"AP-20260201-143000", nome:"Ana Clara", crm:"CRM-PE 22341",
-    hospital:"Hospital Miguel Arraes (HMA)", turno:"Diurno (07h–19h)",
-    diasSemana:"Terça e Quinta", dataInicio:"01/02/2026", prazoDias:90,
-    dataVencimento:"02/05/2026", dataVencISO: new Date(Date.now()+12*86400000).toISOString(),
-    motivoSaida:"Outro serviço / clínica", status:"Ativo" },
-  { protocolo:"AP-20260210-080000", nome:"Marcelo Banja", crm:"CRM-PE 31122",
-    hospital:"Maternidade CISAM", turno:"Noturno (19h–07h)",
-    diasSemana:"Sábado", dataInicio:"10/02/2026", prazoDias:180,
-    dataVencimento:"09/08/2026", dataVencISO: new Date(Date.now()+25*86400000).toISOString(),
-    motivoSaida:"Sobrecarga / questões pessoais", status:"Ativo" },
-  { protocolo:"AP-20260101-100000", nome:"Larissa Tavares", crm:"CRM-PE 19876",
-    hospital:"IMIP Maternidade", turno:"Diurno (07h–19h)",
-    diasSemana:"Sexta", dataInicio:"01/01/2026", prazoDias:90,
-    dataVencimento:"01/04/2026", dataVencISO: new Date(Date.now()+55*86400000).toISOString(),
-    motivoSaida:"Mudança de cidade", status:"Ativo" },
-];
+let avisosPrevios = [];
 
 let apFiltro = "todos";
 
