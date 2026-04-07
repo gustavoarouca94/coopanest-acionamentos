@@ -1716,16 +1716,27 @@ function esRender() {
 
   // ── Constrói entradas da escala em tempo real a partir das fontes do Sheets
 
+  // Garante que dias é sempre array (pode chegar como string JSON do Sheets)
+  const normDias = v => {
+    if (Array.isArray(v.dias)) return v.dias;
+    if (typeof v.dias === "string") {
+      try { return JSON.parse(v.dias); } catch(e) {
+        return v.dias.replace(/[\[\]"]/g,"").split(",").map(s=>s.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  };
+
   // Fonte 1: Licenças ativas (LM, gestacional, disciplinar, saúde)
   const entradasLicencas = [];
   licencasAtivas
-    .filter(l => l.status === "Ativa" && l.dias && Array.isArray(l.dias))
+    .filter(l => l.status === "Ativa" && normDias(l).length > 0)
     .forEach(lm => {
       const tipoEscala = lm.tipo === "gestacional" ? "gestacional"
                        : lm.tipo === "disciplinar"  ? "disciplinar"
                        : lm.tipo === "saude"         ? "saude"
                        : "lm";
-      lm.dias.forEach(dia => {
+      normDias(lm).forEach(dia => {
         const turnos = lm.tipo === "gestacional"
           ? ["N"]
           : lm.turno
@@ -1747,11 +1758,11 @@ function esRender() {
   // Fonte 2: Vagas estruturais (VAGO, quinzenal, etc.) do Sheets
   const entradasVagas = [];
   vagasEstruturais
-    .filter(v => v.status !== "Deletada" && v.status !== "Preenchida" && v.dias && Array.isArray(v.dias))
+    .filter(v => v.status !== "Deletada" && v.status !== "Preenchida" && normDias(v).length > 0)
     .forEach(v => {
       const turnoKey   = (v.turno || "").toLowerCase().includes("noturno") ? "N" : "D";
       const tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
-      v.dias.forEach(dia => {
+      normDias(v).forEach(dia => {
         entradasVagas.push({
           dia, turno: turnoKey,
           hospital:    v.hospital,
@@ -1832,6 +1843,31 @@ function esRender() {
 
   // ── Renderiza calendário
   const cal = document.getElementById("es-calendario");
+
+  // Mostra aviso se ainda não há dados
+  if (licencasAtivas.length === 0 && vagasEstruturais.length === 0) {
+    cal.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-4);">
+      <div style="font-size:28px;margin-bottom:10px;">⏳</div>
+      <strong style="color:var(--texto);display:block;margin-bottom:6px;">Carregando escala…</strong>
+      <div style="font-size:13px;">Aguardando dados das licenças e vagas do servidor.</div>
+      <div style="font-size:12px;margin-top:8px;">Se persistir, clique em ⟳ Atualizar no cabeçalho.</div>
+    </div>`;
+    return;
+  }
+
+  // Se há dados mas todasEntradas está vazio, mostra aviso específico
+  if (todasEntradas.length === 0) {
+    cal.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-4);">
+      <div style="font-size:28px;margin-bottom:10px;">📋</div>
+      <strong style="color:var(--texto);display:block;margin-bottom:6px;">Nenhuma entrada na escala</strong>
+      <div style="font-size:13px;">Licenças carregadas: ${licencasAtivas.length} · Vagas: ${vagasEstruturais.length}</div>
+      <div style="font-size:12px;margin-top:6px;color:var(--alerta);">
+        Verifique se as licenças na planilha têm o campo "Dias (JSON)" preenchido corretamente.
+      </div>
+    </div>`;
+    return;
+  }
+
   cal.innerHTML = DIAS.map(dia => {
     return TURNOS.map(turno => {
       const fixos = todasEntradas.filter(a => a.dia === dia && a.turno === turno.key);
@@ -1842,6 +1878,7 @@ function esRender() {
       });
 
       if (fixos.length === 0 && reps.length === 0) return "";
+      // (célula com entradas — continua renderizando)
 
       const totalAcionamentos = fixos.length;
       const pressaoCor = totalAcionamentos >= 4 ? "var(--erro)"
@@ -1981,7 +2018,30 @@ function lmRender() {
     return;
   }
 
-  lista.innerHTML = itens.map(lm => {
+  // ── Agrupa por cooperada (mesmo nome + tipo) para não duplicar cards
+  const grupos = {};
+  itens.forEach(lm => {
+    const chave = lm.nome + "|" + lm.tipo;
+    if (!grupos[chave]) {
+      grupos[chave] = { ...lm, plantoesList: [] };
+    }
+    // Adiciona este plantão à lista do grupo
+    if (lm.hospital || lm.slot) {
+      const diasArr = (Array.isArray(lm.dias) ? lm.dias : []).join(", ");
+      const turnoStr = lm.turno ? lm.turno.replace(" (07h–19h)","").replace(" (19h–07h)","").replace("Diurno","D").replace("Noturno","N").replace("Manhã","M").replace("Tarde","T") : "";
+      const entrada = [lm.hospital, lm.slot, diasArr, turnoStr].filter(Boolean).join(" · ");
+      if (!grupos[chave].plantoesList.includes(entrada)) {
+        grupos[chave].plantoesList.push(entrada);
+      }
+    }
+    // Usa o retorno/duracao mais recente (pode variar por linha)
+    if (lm.retorno && lm.retorno !== "—") grupos[chave].retorno = lm.retorno;
+    if (lm.duracao) grupos[chave].duracao = lm.duracao;
+  });
+
+  const itensAgrupados = Object.values(grupos);
+
+  lista.innerHTML = itensAgrupados.map(lm => {
     const diasR = lmDiasRestantes(lm);
     const prog  = lmProgresso(lm);
     const tipoLabel = lm.tipo === "lm" ? "Licença-maternidade" : lm.tipo === "gestacional" ? "Gestacional" : lm.tipo === "disciplinar" ? "Disciplinar" : "Afastamento por saúde";
@@ -2028,7 +2088,12 @@ function lmRender() {
         <div class="acion-avatar" style="${tipoCor}">${lm.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</div>
         <div class="acion-info">
           <div class="acion-nome">${lm.nome}</div>
-          <div class="acion-sub">${lm.plantoes || "Plantões não especificados"}</div>
+          <div class="acion-sub" style="line-height:1.7;">
+            ${lm.plantoesList && lm.plantoesList.length
+              ? lm.plantoesList.map(p => `<span style="display:inline-block;margin-right:8px;">📍 ${p}</span>`).join("")
+              : lm.hospital ? `📍 ${lm.hospital} · ${lm.slot || ""}` : "Plantões não especificados"
+            }
+          </div>
           <div class="acion-tags">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tipoCor}">${tipoLabel}</span>
             ${retornoTag}
@@ -2047,13 +2112,14 @@ function lmEncerrar(id) {
   if (!lm) return;
   if (!confirm(`Confirmar encerramento da licença de ${lm.nome}?\n\nOs acionamentos de reserva referentes a esta licença serão cessados.`)) return;
   lm.status = "Encerrada — retornou";
-  // Remove da escala semanal
-  for (let i = ES_ACIONAMENTOS_FIXOS.length - 1; i >= 0; i--) {
-    if (ES_ACIONAMENTOS_FIXOS[i].plantonista === lm.nome) ES_ACIONAMENTOS_FIXOS.splice(i, 1);
-  }
-  // Remove vagas LM correspondentes
-  vagasEstruturais = vagasEstruturais.filter(v => v.plantonista !== lm.nome || v.tipo !== lm.tipo);
-  enviarAcao({ action: "encerrarLicenca", id, nome: lm.nome, status: lm.status });
+  // Encerra TODAS as linhas deste mesmo nome+tipo na planilha
+  const nomeLm = lm.nome;
+  licencasAtivas
+    .filter(l => l.nome === nomeLm && l.tipo === lm.tipo)
+    .forEach(l => {
+      l.status = "Encerrada — retornou";
+      enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: l.status });
+    });
   atualizarBadge(); lmRender(); vgRender(); esRender();
   mostrarToast(`✓ Licença de ${lm.nome} encerrada — acionamentos cessados`);
 }
@@ -2063,13 +2129,16 @@ function lmDefinirRetorno(id) {
   if (!lm) return;
   const data = prompt(`Data de retorno de ${lm.nome} (formato DD/MM/AAAA):`);
   if (!data || !data.trim()) return;
-  lm.retorno = data.trim();
-  // Persiste no GS — busca primeiro se existe na planilha; se não, registra primeiro
-  enviarAcao({ action: "atualizarRetornoLicenca", id, retorno: lm.retorno });
-  // Garante que a licença existe na planilha (caso seja pré-carregada do HTML)
-  enviarAcao({ action: "registrarLicenca", licenca: lm });
+  // Atualiza TODAS as linhas do mesmo nome+tipo
+  licencasAtivas
+    .filter(l => l.nome === lm.nome && l.tipo === lm.tipo)
+    .forEach(l => {
+      l.retorno = data.trim();
+      enviarAcao({ action: "atualizarRetornoLicenca", id: l.id, retorno: l.retorno });
+    });
   lmRender();
-  mostrarToast(`📅 Retorno de ${lm.nome} definido para ${lm.retorno}`);
+  esRender();
+  mostrarToast(`📅 Retorno de ${lm.nome} definido para ${data.trim()}`);
 }
 
 // Converte afastamento gestacional em LM no momento do parto
@@ -2256,8 +2325,10 @@ function lmPopularEscala(lm) {
 
 // Converte gestacional → LM no momento do parto
 function lmConverterParaLM(id) {
-  const lm = licencasAtivas.find(x => x.id === id);
-  if (!lm) return;
+  // id pode ser o id de qualquer linha do grupo — busca todas as gestacionais do mesmo nome
+  const lmRef = licencasAtivas.find(x => x.id === id);
+  if (!lmRef) return;
+  const lm = lmRef; // usa como referência
   if (!confirm(`Confirmar início da LM de ${lm.nome}?\n\nAfastamento gestacional encerrado. LM de 120 dias começa hoje.`)) return;
 
   const hoje = new Date();
