@@ -365,7 +365,6 @@ body {
     </div>
     <div class="tab" id="tab-vagas" onclick="mudarTab('vagas')">
       Vagas em Aberto
-      <span class="badge-tab" id="badge-vagas">0</span>
     </div>
     <div class="tab" id="tab-escala" onclick="mudarTab('escala')">
       Escala Semanal
@@ -1765,8 +1764,50 @@ function esRender() {
       });
     });
 
-  // Une tudo — licenças primeiro, depois vagas estruturais
-  const todasEntradas = [...entradasLicencas, ...entradasVagas];
+  // Fonte 3: Acionamentos prolongados vindos do formulário do plantonista
+  // (LM, gestacional, disciplinar, saúde, internamento, etc. com dataRep ou sem data definida)
+  const motivosProlongados = [
+    "Licença-maternidade", "Afastamento gestacional", "Afastamento disciplinar",
+    "Afastamento temporário por saúde", "Internamento hospitalar", "Cirurgia não estética"
+  ];
+  const entradasAcionamentos = [];
+  acionamentos
+    .filter(a => {
+      const motivo = a.motivo || "";
+      return motivosProlongados.some(m => motivo.includes(m));
+    })
+    .forEach(a => {
+      // Infere dia da semana e turno a partir da data do plantão
+      const dia = esDiaSemana(
+        (() => {
+          // dataPlantao pode estar em ISO (AAAA-MM-DD) ou DD/MM/AAAA
+          const dp = a.dataPlantao || "";
+          if (dp.includes("-")) {
+            const [y,m,d] = dp.split("-");
+            return `${d}/${m}/${y}`;
+          }
+          return dp;
+        })()
+      );
+      if (!dia) return;
+      const turnoKey = (a.turno || "").toLowerCase().includes("noturno") ? "N" : "D";
+      const tipo     = (a.motivo || "").includes("gestacional") ? "gestacional"
+                     : (a.motivo || "").includes("disciplinar")  ? "disciplinar"
+                     : (a.motivo || "").includes("maternidade")  ? "lm"
+                     : "lm";
+      entradasAcionamentos.push({
+        dia, turno: turnoKey,
+        hospital:    a.hospital  || "—",
+        slot:        a.setor     || a.turno || "—",
+        plantonista: a.nome      || "—",
+        tipo,
+        retorno:     a.dataRep   || "Em aberto",
+        protocolo:   a.protocolo || "",
+      });
+    });
+
+  // Une todas as fontes
+  const todasEntradas = [...entradasLicencas, ...entradasVagas, ...entradasAcionamentos];
 
   // ── Renderiza lista de reposições
   const repLista = document.getElementById("es-reposicoes-lista");
