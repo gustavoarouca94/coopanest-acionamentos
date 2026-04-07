@@ -1708,270 +1708,226 @@ function esDiaSemana(dataStr) {
 }
 
 function esRender() {
-  const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const DIAS   = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const TURNOS = [
     { key:"D", label:"Diurno — 07h às 19h" },
     { key:"N", label:"Noturno — 19h às 07h" }
   ];
 
-  // ── Constrói entradas da escala em tempo real a partir das fontes do Sheets
+  // Normaliza o campo dias para array independente do formato vindo do Sheets
+  function toDiasArr(v) {
+    var d = v.dias;
+    if (Array.isArray(d)) return d;
+    if (!d) return [];
+    var s = String(d).trim();
+    try { return JSON.parse(s); } catch(e) {}
+    return s.replace(/[\[\]"]/g,"").split(",").map(function(x){return x.trim();}).filter(Boolean);
+  }
 
-  // Garante que dias é sempre array (pode chegar como string JSON do Sheets)
-  const normDias = v => {
-    if (Array.isArray(v.dias)) return v.dias;
-    if (typeof v.dias === "string") {
-      try { return JSON.parse(v.dias); } catch(e) {
-        return v.dias.replace(/[\[\]"]/g,"").split(",").map(s=>s.trim()).filter(Boolean);
-      }
+  // ── Constrói lista unificada de entradas
+  var entradas = [];
+
+  // FONTE 1 — Licenças ativas (LM, gestacional, disciplinar, saúde)
+  licencasAtivas.forEach(function(lm) {
+    if (lm.status !== "Ativa") return;
+    var dias = toDiasArr(lm);
+    if (!dias.length) return;
+    var tipoEscala = lm.tipo === "gestacional" ? "gestacional"
+                   : lm.tipo === "disciplinar"  ? "disciplinar"
+                   : lm.tipo === "saude"         ? "saude"
+                   : "lm";
+    dias.forEach(function(dia) {
+      var turnoKey = lm.tipo === "gestacional" ? "N"
+                   : (lm.turno || "").toLowerCase().indexOf("noturno") >= 0 ? "N" : "D";
+      entradas.push({
+        dia:         dia,
+        turno:       turnoKey,
+        hospital:    lm.hospital || lm.slot || "—",
+        slot:        lm.slot     || lm.hospital || "—",
+        plantonista: lm.nome,
+        tipo:        tipoEscala,
+        retorno:     lm.retorno  || "Em aberto",
+      });
+    });
+  });
+
+  // FONTE 2 — Vagas estruturais do Sheets (VAGO, quinzenal, disciplinar, etc.)
+  vagasEstruturais.forEach(function(v) {
+    if (v.status === "Deletada" || v.status === "Preenchida") return;
+    var dias = toDiasArr(v);
+    if (!dias.length) return;
+    var turnoKey   = (v.turno || "").toLowerCase().indexOf("noturno") >= 0 ? "N" : "D";
+    var tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
+    dias.forEach(function(dia) {
+      entradas.push({
+        dia:         dia,
+        turno:       turnoKey,
+        hospital:    v.hospital,
+        slot:        v.slot     || "—",
+        plantonista: v.plantonista || "—",
+        tipo:        tipoEscala,
+        quinzena:    v.quinzena || null,
+        retorno:     v.retorno  || "—",
+      });
+    });
+  });
+
+  // FONTE 3 — Acionamentos prolongados do formulário do plantonista
+  var motivosProl = ["Licença-maternidade","Afastamento gestacional",
+                     "Afastamento disciplinar","Afastamento temporário por saúde",
+                     "Internamento hospitalar","Cirurgia não estética"];
+  acionamentos.forEach(function(a) {
+    var motivo = a.motivo || "";
+    if (!motivosProl.some(function(m){ return motivo.indexOf(m) >= 0; })) return;
+    var dp  = (a.dataPlantao || "");
+    if (dp.indexOf("-") >= 0) { var p=dp.split("-"); dp=p[2]+"/"+p[1]+"/"+p[0]; }
+    var dia = esDiaSemana(dp);
+    if (!dia) return;
+    var turnoKey = (a.turno||"").toLowerCase().indexOf("noturno") >= 0 ? "N" : "D";
+    var tipo = motivo.indexOf("gestacional") >= 0 ? "gestacional"
+             : motivo.indexOf("disciplinar")  >= 0 ? "disciplinar" : "lm";
+    entradas.push({
+      dia:         dia,
+      turno:       turnoKey,
+      hospital:    a.hospital  || "—",
+      slot:        a.setor     || a.turno || "—",
+      plantonista: a.nome      || "—",
+      tipo:        tipo,
+      retorno:     a.dataRep   || "Em aberto",
+      protocolo:   a.protocolo || "",
+    });
+  });
+
+  // ── Renderiza reposições
+  var repLista = document.getElementById("es-reposicoes-lista");
+  if (repLista) {
+    if (esReposicoes.length === 0) {
+      repLista.innerHTML = '<div style="font-size:13px;color:var(--cinza-4);padding:8px 0;">Nenhuma reposição agendada. As reposições dos acionamentos aparecem aqui automaticamente.</div>';
+    } else {
+      repLista.innerHTML = esReposicoes.map(function(r) {
+        var dia = esDiaSemana(r.dataRep);
+        return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--amarelo-bg);border-left:3px solid var(--amarelo);border-radius:0 var(--r) var(--r) 0;padding:8px 12px;font-size:13px;">' +
+          '<div>' +
+          '<strong style="color:var(--texto)">' + r.plantonista + '</strong>' +
+          '<span style="color:var(--cinza-4);margin:0 6px">·</span>' +
+          '<span style="color:var(--texto)">' + r.hospital + '</span>' +
+          '<span style="color:var(--cinza-4);margin:0 6px">·</span>' +
+          '<span style="color:var(--amarelo);font-weight:600">📅 ' + r.dataRep + (dia?" ("+dia+")":"") + ' — ' + r.turnoRep + '</span>' +
+          (r.fonte==="manual" ? '<span style="font-size:11px;background:var(--cinza-1);color:var(--cinza-4);padding:1px 7px;border-radius:10px;margin-left:8px;">manual</span>' : "") +
+          '</div>' +
+          '<button onclick="esRemoverReposicao(\'' + r.id + '\')" style="background:none;border:none;color:var(--cinza-4);cursor:pointer;font-size:14px;padding:2px 6px;">✕</button>' +
+          '</div>';
+      }).join("");
     }
-    return [];
-  };
-
-  // Fonte 1: Licenças ativas (LM, gestacional, disciplinar, saúde)
-  const entradasLicencas = [];
-  licencasAtivas
-    .filter(l => l.status === "Ativa" && normDias(l).length > 0)
-    .forEach(lm => {
-      const tipoEscala = lm.tipo === "gestacional" ? "gestacional"
-                       : lm.tipo === "disciplinar"  ? "disciplinar"
-                       : lm.tipo === "saude"         ? "saude"
-                       : "lm";
-      normDias(lm).forEach(dia => {
-        const turnos = lm.tipo === "gestacional"
-          ? ["N"]
-          : lm.turno
-            ? [(lm.turno.toLowerCase().includes("noturno") ? "N" : "D")]
-            : ["D"];
-        turnos.forEach(turnoKey => {
-          entradasLicencas.push({
-            dia, turno: turnoKey,
-            hospital:    lm.hospital || lm.slot || "—",
-            slot:        lm.slot     || "—",
-            plantonista: lm.nome,
-            tipo:        tipoEscala,
-            retorno:     lm.retorno  || "Em aberto",
-          });
-        });
-      });
-    });
-
-  // Fonte 2: Vagas estruturais (VAGO, quinzenal, etc.) do Sheets
-  const entradasVagas = [];
-  vagasEstruturais
-    .filter(v => v.status !== "Deletada" && v.status !== "Preenchida" && normDias(v).length > 0)
-    .forEach(v => {
-      const turnoKey   = (v.turno || "").toLowerCase().includes("noturno") ? "N" : "D";
-      const tipoEscala = v.tipo === "vago_quinzenal" ? "quinzenal" : v.tipo || "vago";
-      normDias(v).forEach(dia => {
-        entradasVagas.push({
-          dia, turno: turnoKey,
-          hospital:    v.hospital,
-          slot:        v.slot     || "—",
-          plantonista: v.plantonista || "—",
-          tipo:        tipoEscala,
-          quinzena:    v.quinzena || null,
-          retorno:     v.retorno  || "—",
-        });
-      });
-    });
-
-  // Fonte 3: Acionamentos prolongados vindos do formulário do plantonista
-  // (LM, gestacional, disciplinar, saúde, internamento, etc. com dataRep ou sem data definida)
-  const motivosProlongados = [
-    "Licença-maternidade", "Afastamento gestacional", "Afastamento disciplinar",
-    "Afastamento temporário por saúde", "Internamento hospitalar", "Cirurgia não estética"
-  ];
-  const entradasAcionamentos = [];
-  acionamentos
-    .filter(a => {
-      const motivo = a.motivo || "";
-      return motivosProlongados.some(m => motivo.includes(m));
-    })
-    .forEach(a => {
-      // Infere dia da semana e turno a partir da data do plantão
-      const dia = esDiaSemana(
-        (() => {
-          // dataPlantao pode estar em ISO (AAAA-MM-DD) ou DD/MM/AAAA
-          const dp = a.dataPlantao || "";
-          if (dp.includes("-")) {
-            const [y,m,d] = dp.split("-");
-            return `${d}/${m}/${y}`;
-          }
-          return dp;
-        })()
-      );
-      if (!dia) return;
-      const turnoKey = (a.turno || "").toLowerCase().includes("noturno") ? "N" : "D";
-      const tipo     = (a.motivo || "").includes("gestacional") ? "gestacional"
-                     : (a.motivo || "").includes("disciplinar")  ? "disciplinar"
-                     : (a.motivo || "").includes("maternidade")  ? "lm"
-                     : "lm";
-      entradasAcionamentos.push({
-        dia, turno: turnoKey,
-        hospital:    a.hospital  || "—",
-        slot:        a.setor     || a.turno || "—",
-        plantonista: a.nome      || "—",
-        tipo,
-        retorno:     a.dataRep   || "Em aberto",
-        protocolo:   a.protocolo || "",
-      });
-    });
-
-  // Une todas as fontes
-  const todasEntradas = [...entradasLicencas, ...entradasVagas, ...entradasAcionamentos];
-
-  // ── Renderiza lista de reposições
-  const repLista = document.getElementById("es-reposicoes-lista");
-  if (esReposicoes.length === 0) {
-    repLista.innerHTML = `<div style="font-size:13px;color:var(--cinza-4);padding:8px 0;">Nenhuma reposição agendada. As reposições dos acionamentos aparecem aqui automaticamente.</div>`;
-  } else {
-    repLista.innerHTML = esReposicoes.map(r => {
-      const dia = esDiaSemana(r.dataRep);
-      return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--amarelo-bg);border-left:3px solid var(--amarelo);border-radius:0 var(--r) var(--r) 0;padding:8px 12px;font-size:13px;">
-        <div>
-          <strong style="color:var(--texto)">${r.plantonista}</strong>
-          <span style="color:var(--cinza-4);margin:0 6px">·</span>
-          <span style="color:var(--texto)">${r.hospital}</span>
-          <span style="color:var(--cinza-4);margin:0 6px">·</span>
-          <span style="color:var(--amarelo);font-weight:600">${r.dataRep}${dia?" ("+dia+")":""} — ${r.turnoRep}</span>
-          ${r.fonte==="manual"?'<span style="font-size:11px;background:var(--cinza-1);color:var(--cinza-4);padding:1px 7px;border-radius:10px;margin-left:8px;">manual</span>':""}
-        </div>
-        <button onclick="esRemoverReposicao('${r.id}')" style="background:none;border:none;color:var(--cinza-4);cursor:pointer;font-size:14px;padding:2px 6px;">✕</button>
-      </div>`;
-    }).join("");
   }
 
   // ── Renderiza calendário
-  const cal = document.getElementById("es-calendario");
+  var cal = document.getElementById("es-calendario");
+  if (!cal) return;
 
-  // Mostra aviso se ainda não há dados
+  // Diagnóstico se sem dados
   if (licencasAtivas.length === 0 && vagasEstruturais.length === 0) {
-    cal.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-4);">
-      <div style="font-size:28px;margin-bottom:10px;">⏳</div>
-      <strong style="color:var(--texto);display:block;margin-bottom:6px;">Carregando escala…</strong>
-      <div style="font-size:13px;">Aguardando dados das licenças e vagas do servidor.</div>
-      <div style="font-size:12px;margin-top:8px;">Se persistir, clique em ⟳ Atualizar no cabeçalho.</div>
-    </div>`;
+    cal.innerHTML = '<div style="text-align:center;padding:40px;color:var(--cinza-4);">' +
+      '<div style="font-size:28px;margin-bottom:10px;">⏳</div>' +
+      '<strong style="color:var(--texto);display:block;margin-bottom:6px;">Carregando escala…</strong>' +
+      '<div style="font-size:13px;">Aguardando dados do servidor.</div>' +
+      '<div style="font-size:12px;margin-top:8px;">Clique em ⟳ Atualizar se persistir.</div>' +
+      '</div>';
     return;
   }
 
-  // Se há dados mas todasEntradas está vazio, mostra aviso específico
-  if (todasEntradas.length === 0) {
-    cal.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-4);">
-      <div style="font-size:28px;margin-bottom:10px;">📋</div>
-      <strong style="color:var(--texto);display:block;margin-bottom:6px;">Nenhuma entrada na escala</strong>
-      <div style="font-size:13px;">Licenças carregadas: ${licencasAtivas.length} · Vagas: ${vagasEstruturais.length}</div>
-      <div style="font-size:12px;margin-top:6px;color:var(--alerta);">
-        Verifique se as licenças na planilha têm o campo "Dias (JSON)" preenchido corretamente.
-      </div>
-    </div>`;
+  if (entradas.length === 0) {
+    cal.innerHTML = '<div style="text-align:center;padding:40px;color:var(--cinza-4);">' +
+      '<div style="font-size:28px;margin-bottom:10px;">📋</div>' +
+      '<strong style="color:var(--texto);display:block;margin-bottom:6px;">Nenhuma entrada na escala</strong>' +
+      '<div style="font-size:13px;">Licenças: ' + licencasAtivas.length + ' · Vagas: ' + vagasEstruturais.length + '</div>' +
+      '<div style="font-size:11px;margin-top:6px;color:var(--alerta);">Verifique se o campo Dias (JSON) está preenchido na planilha.</div>' +
+      '</div>';
     return;
   }
 
-  cal.innerHTML = DIAS.map(dia => {
-    return TURNOS.map(turno => {
-      const fixos = todasEntradas.filter(a => a.dia === dia && a.turno === turno.key);
-      const reps  = esReposicoes.filter(r => {
-        const d = esDiaSemana(r.dataRep);
-        const t = r.turnoRep && r.turnoRep.toLowerCase().includes("diurno") ? "D" : "N";
+  var html = "";
+  DIAS.forEach(function(dia) {
+    TURNOS.forEach(function(turno) {
+      var fixos = entradas.filter(function(a){ return a.dia === dia && a.turno === turno.key; });
+      var reps  = esReposicoes.filter(function(r) {
+        var d = esDiaSemana(r.dataRep);
+        var t = r.turnoRep && r.turnoRep.toLowerCase().indexOf("diurno") >= 0 ? "D" : "N";
         return d === dia && t === turno.key;
       });
 
-      if (fixos.length === 0 && reps.length === 0) return "";
-      // (célula com entradas — continua renderizando)
+      if (fixos.length === 0 && reps.length === 0) return;
 
-      const totalAcionamentos = fixos.length;
-      const pressaoCor = totalAcionamentos >= 4 ? "var(--erro)"
-                       : totalAcionamentos >= 3 ? "var(--alerta)"
-                       : totalAcionamentos >= 2 ? "#eab308"
-                       : "var(--verde)";
+      var totalAcion = fixos.length;
+      var pressaoCor = totalAcion >= 4 ? "var(--erro)"
+                     : totalAcion >= 3 ? "var(--alerta)"
+                     : totalAcion >= 2 ? "#eab308"
+                     : "var(--verde)";
 
-      const fixosHTML = fixos.map(a => {
-        // Cor e label corretos por tipo
-        const tagCor = a.tipo === "disciplinar"
-          ? "background:var(--erro-bg);color:var(--erro)"
-          : a.tipo === "lm"
-          ? "background:var(--amarelo-bg);color:var(--amarelo)"
-          : a.tipo === "quinzenal"
-          ? "background:var(--info-bg);color:var(--info)"
-          : "background:var(--verde-light);color:var(--verde-dark)"; // vago
-
-        const tagTxt = a.tipo === "disciplinar" ? "Disc."
-          : a.tipo === "lm"       ? "LM"
-          : a.tipo === "quinzenal" ? (a.quinzena ? "Q"+a.quinzena : "Quinz.")
-          : "Vago";
-
-        // Plantonista: mostra "Vaga aberta" para vagos sem plantonista
-        const nomePlantonista = (!a.plantonista || a.plantonista === "—")
+      var fixosHTML = fixos.map(function(a) {
+        var tagCor = a.tipo === "disciplinar"  ? "background:var(--erro-bg);color:var(--erro)"
+                   : a.tipo === "lm"           ? "background:var(--amarelo-bg);color:var(--amarelo)"
+                   : a.tipo === "gestacional"  ? "background:var(--info-bg);color:var(--info)"
+                   : a.tipo === "quinzenal"    ? "background:var(--info-bg);color:var(--info)"
+                   : a.tipo === "saude"        ? "background:var(--cinza-1);color:var(--cinza-4)"
+                   : "background:var(--verde-light);color:var(--verde-dark)";
+        var tagTxt = a.tipo === "disciplinar" ? "Disc."
+                   : a.tipo === "lm"          ? "LM"
+                   : a.tipo === "gestacional" ? "Gest."
+                   : a.tipo === "saude"       ? "Saúde"
+                   : a.tipo === "quinzenal"   ? (a.quinzena ? "Q"+a.quinzena : "Quinz.")
+                   : "Vago";
+        var nome = (!a.plantonista || a.plantonista === "—")
           ? '<span style="color:var(--cinza-4);font-style:italic;">Vaga em aberto</span>'
           : a.plantonista;
-
-        const urgencia = a.retorno && a.retorno !== "Em aberto" && a.retorno !== "Afastada" && a.retorno !== "—"
-          ? (() => {
-              const parts = a.retorno.split("/");
-              if (parts.length < 2) return "";
-              const hoje = new Date();
-              const ret = new Date(hoje.getFullYear(), parseInt(parts[1])-1, parseInt(parts[0]));
-              const dias = Math.ceil((ret - hoje) / 86400000);
-              return dias <= 7  ? ' <span style="font-size:10px;color:var(--erro);font-weight:700;">retorna em '+dias+'d</span>'
-                   : dias <= 15 ? ' <span style="font-size:10px;color:var(--alerta);font-weight:700;">retorna em '+dias+'d</span>'
-                   : '';
-            })()
-          : a.retorno === "Afastada" ? ' <span style="font-size:10px;color:var(--cinza-4);">afastada</span>' : '';
-
-        // Badge extra de quinzena
-        const quinzenaBadge = a.tipo === "quinzenal" && a.quinzena
-          ? `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--info-bg);color:var(--info);margin-left:4px;">Quinzena ${a.quinzena}</span>`
+        var urgencia = "";
+        if (a.retorno && a.retorno !== "Em aberto" && a.retorno !== "Afastada" && a.retorno !== "—" && a.retorno !== "Até o parto") {
+          var pts = a.retorno.split("/");
+          if (pts.length === 3) {
+            var ret = new Date(parseInt(pts[2]), parseInt(pts[1])-1, parseInt(pts[0]));
+            var dias = Math.ceil((ret - new Date()) / 86400000);
+            urgencia = dias <= 0  ? ' <span style="font-size:10px;color:var(--verde);font-weight:700;">retornou</span>'
+                     : dias <= 7  ? ' <span style="font-size:10px;color:var(--erro);font-weight:700;">retorna '+dias+'d</span>'
+                     : dias <= 15 ? ' <span style="font-size:10px;color:var(--alerta);font-weight:700;">retorna '+dias+'d</span>'
+                     : "";
+          }
+        } else if (a.retorno === "Afastada") {
+          urgencia = ' <span style="font-size:10px;color:var(--cinza-4);">afastada</span>';
+        }
+        var quinzenaBadge = (a.tipo === "quinzenal" && a.quinzena)
+          ? '<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--info-bg);color:var(--info);margin-left:4px;">Q'+a.quinzena+'</span>'
           : "";
-
-        return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--cinza-0);border-radius:6px;margin-bottom:4px;">
-          <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;${tagCor};white-space:nowrap;">${tagTxt}</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nomePlantonista}${urgencia}${quinzenaBadge}</div>
-            <div style="font-size:11px;color:var(--cinza-4);">${a.hospital} — ${a.slot}</div>
-          </div>
-        </div>`;
+        return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--cinza-0);border-radius:6px;margin-bottom:4px;">' +
+          '<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;'+tagCor+';white-space:nowrap;">'+tagTxt+'</span>' +
+          '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+nome+urgencia+quinzenaBadge+'</div>' +
+          '<div style="font-size:11px;color:var(--cinza-4);">'+a.hospital+' — '+a.slot+'</div>' +
+          '</div></div>';
       }).join("");
 
-      const repsHTML = reps.map(r => {
-        const dataFormatada = r.dataRep
-          ? (() => {
-              const parts = r.dataRep.split("/");
-              if (parts.length === 3) return r.dataRep;
-              // Tenta formato ISO
-              const d = new Date(r.dataRep + "T12:00:00");
-              const p = n => String(n).padStart(2,"0");
-              return isNaN(d) ? r.dataRep : `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
-            })()
-          : "—";
-        return `
-        <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--amarelo-bg);border-left:2px solid var(--amarelo);border-radius:0 6px 6px 0;margin-bottom:4px;">
-          <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--amarelo);color:white;white-space:nowrap;">REP</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:600;color:var(--texto);">${r.plantonista}</div>
-            <div style="font-size:11px;color:var(--cinza-4);">${r.hospital} — repondo falta neste turno</div>
-            <div style="font-size:11px;font-weight:600;color:var(--amarelo);">📅 Agendado para ${dataFormatada} · ${r.turnoRep}</div>
-          </div>
-        </div>`}).join("");
+      var repsHTML = reps.map(function(r) {
+        var dataF = r.dataRep || "—";
+        return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--amarelo-bg);border-left:2px solid var(--amarelo);border-radius:0 6px 6px 0;margin-bottom:4px;">' +
+          '<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--amarelo);color:white;white-space:nowrap;">REP</span>' +
+          '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--texto);">'+r.plantonista+'</div>' +
+          '<div style="font-size:11px;color:var(--cinza-4);">'+r.hospital+'</div>' +
+          '<div style="font-size:11px;font-weight:600;color:var(--amarelo);">📅 '+dataF+' · '+r.turnoRep+'</div>' +
+          '</div></div>';
+      }).join("");
 
-      return `<div style="background:white;border:1px solid var(--cinza-1);border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;">
-        <div style="background:var(--verde-dark);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <span style="font-size:13px;font-weight:700;color:white;">${dia}</span>
-            <span style="font-size:11px;color:rgba(255,255,255,.65);margin-left:6px;">${turno.label}</span>
-          </div>
-          <span style="font-size:12px;font-weight:700;color:${pressaoCor};background:rgba(255,255,255,.12);padding:2px 10px;border-radius:12px;">
-            ${totalAcionamentos} acion.${totalReps > 0 ? " · "+totalReps+" rep." : ""}
-          </span>
-        </div>
-        <div style="padding:10px 12px;">
-          ${fixosHTML}
-          ${repsHTML}
-          ${totalReps > 0 ? `<div style="font-size:11px;color:var(--verde);margin-top:6px;padding:4px 8px;background:var(--verde-light);border-radius:6px;">✓ ${totalReps} reposição(ões) neste turno — pressão sobre reservas reduzida em ${totalReps}</div>` : ""}
-        </div>
-      </div>`;
-    }).join("");
-  }).join("");
+      html += '<div style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;margin-bottom:10px;">' +
+        '<div style="background:'+pressaoCor+';padding:8px 14px;display:flex;align-items:center;justify-content:space-between;">' +
+        '<span style="font-size:13px;font-weight:700;color:white;">'+dia+' — '+turno.label+'</span>' +
+        '<span style="background:rgba(255,255,255,.25);color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">'+
+          totalAcion+' vaga'+( totalAcion===1?"":"s")+' · '+reps.length+' rep'+'</span>' +
+        '</div>' +
+        '<div style="padding:10px 10px 6px;">'+fixosHTML+repsHTML+'</div>' +
+        '</div>';
+    });
+  });
+
+  cal.innerHTML = html || '<div style="text-align:center;padding:32px;color:var(--cinza-4);font-size:13px;">Nenhuma vaga registrada esta semana.</div>';
 }
 
 // ════ LICENÇAS / LM ════
