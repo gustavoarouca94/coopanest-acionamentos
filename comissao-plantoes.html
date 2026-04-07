@@ -1624,46 +1624,63 @@ let esReposicoes = [];
 
 // Busca reposições do Apps Script
 function esBuscarReposicoes() {
-  // Monta reposições a partir dos acionamentos locais já carregados
-  function esPopularDeLocal() {
-    const repsLocal = acionamentos.filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep);
-    const idsJaExistem = new Set(esReposicoes.map(r => r.id));
-    repsLocal.forEach(a => {
-      if (!idsJaExistem.has(a.protocolo)) {
-        esReposicoes.push({
-          id: a.protocolo,
-          plantonista: a.nome,
-          hospital: a.hospital,
-          dataRep: a.dataRep,
-          turnoRep: a.turnoRep || "—",
-          fonte: "sistema"
-        });
-        idsJaExistem.add(a.protocolo);
-      }
-    });
+  // Normaliza dataRep — pode chegar como Date do Sheets, string ISO ou DD/MM/AAAA
+  function normDataRep(val) {
+    if (!val) return "";
+    if (val instanceof Date) {
+      const p = n => String(n).padStart(2,"0");
+      return `${p(val.getDate())}/${p(val.getMonth()+1)}/${val.getFullYear()}`;
+    }
+    const s = String(val).trim();
+    // ISO AAAA-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const [y,m,d] = s.split("T")[0].split("-");
+      return `${d}/${m}/${y}`;
+    }
+    return s;
   }
 
-  esPopularDeLocal();
+  // Reconstrói do zero a cada chamada para evitar duplicatas
+  const manuais = esReposicoes.filter(r => r.fonte === "manual");
+  esReposicoes = [...manuais];
+
+  // Popula dos acionamentos já em memória
+  acionamentos
+    .filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep)
+    .forEach(a => {
+      const jaExiste = esReposicoes.some(r => r.id === a.protocolo);
+      if (!jaExiste) {
+        esReposicoes.push({
+          id:          a.protocolo,
+          plantonista: a.nome,
+          hospital:    a.hospital,
+          dataRep:     normDataRep(a.dataRep),
+          turnoRep:    a.turnoRep || "—",
+          fonte:       "sistema"
+        });
+      }
+    });
+
   esRender();
 
-  // Também busca do GS para pegar acionamentos não carregados localmente
+  // Busca do GS para complementar (acionamentos não carregados localmente)
   if (APPS_SCRIPT_URL.includes("COLE_AQUI")) return;
   fetch(APPS_SCRIPT_URL + "?action=listarAcionamentos")
     .then(r => r.json())
     .then(d => {
       if (!d.dados) return;
-      const idsJaExistem = new Set(esReposicoes.map(r => r.id));
       d.dados
         .filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep)
         .forEach(a => {
-          if (!idsJaExistem.has(a.protocolo)) {
+          const jaExiste = esReposicoes.some(r => r.id === a.protocolo);
+          if (!jaExiste) {
             esReposicoes.push({
-              id: a.protocolo,
+              id:          a.protocolo,
               plantonista: a.nome,
-              hospital: a.hospital,
-              dataRep: a.dataRep,
-              turnoRep: a.turnoRep || "—",
-              fonte: "sistema"
+              hospital:    a.hospital,
+              dataRep:     normDataRep(a.dataRep),
+              turnoRep:    a.turnoRep || "—",
+              fonte:       "sistema"
             });
           }
         });
