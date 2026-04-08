@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a5c3a">
 <title>COOPANEST-PE — Comissão de Plantões</title>
 <link rel="manifest" href="manifest.json">
@@ -89,17 +89,24 @@ body {
 .tabs-bar {
   background: var(--verde-logo);
   border-top: 1px solid rgba(255,255,255,.08);
+  position: sticky; top: 0; z-index: 100;
 }
 .tabs-inner {
   max-width: 900px; margin: 0 auto;
   display: flex; gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.tabs-inner::-webkit-scrollbar { display: none; }
 .tab {
-  padding: 11px 20px; font-size: 13px; font-weight: 600;
+  padding: 12px 18px; font-size: 13px; font-weight: 600;
   color: rgba(255,255,255,.55); cursor: pointer;
   border-bottom: 3px solid transparent;
   transition: color .15s, border-color .15s;
-  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap; flex-shrink: 0;
+  min-height: 44px;
 }
 .tab:hover { color: rgba(255,255,255,.85); }
 .tab.ativa { color: white; border-bottom-color: #4ade80; }
@@ -327,6 +334,79 @@ body {
 }
 .empty-state .em-icon { font-size: 36px; margin-bottom: 10px; }
 .empty-state strong { display: block; color: var(--texto); font-size: 15px; margin-bottom: 4px; }
+
+/* ══════════════════════════════════════════════
+   MOBILE / iOS — CORREÇÕES GLOBAIS
+   ══════════════════════════════════════════════ */
+
+/* Evita zoom ao focar inputs no iOS (exige font-size >= 16px) */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Remove flash azul de toque */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Safe area — notch e home indicator */
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left:   env(safe-area-inset-left);
+  padding-right:  env(safe-area-inset-right);
+}
+
+/* Tap targets mínimos de 44px */
+button, .tab, .opcao-card, .btn-acao,
+.btn-enviar, .btn-primary, .btn-concluir,
+.btn-buscar, .btn-novo, .btn-imprimir,
+.filtro-btn {
+  min-height: 44px;
+  touch-action: manipulation; /* sem delay de 300ms */
+}
+
+/* Evita overflow horizontal acidental */
+html, body { overflow-x: hidden; max-width: 100vw; }
+
+/* Cards não saem da tela */
+.acion-card, .form-card, .card, .comprovante-wrapper {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tabela do histórico vira scroll horizontal */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { min-width: 600px; }
+
+@media (max-width: 600px) {
+  /* Dois colunas viram uma coluna */
+  .dois-col { grid-template-columns: 1fr !important; }
+
+  /* Padding menor em telas pequenas */
+  .wrapper, .tela { padding-left: 12px !important; padding-right: 12px !important; }
+
+  /* Botões de ação empilham */
+  .acion-acoes { flex-wrap: wrap; gap: 6px; }
+  .acion-acoes .btn-acao { flex: 1 1 auto; min-width: 140px; }
+
+  /* Header mais compacto */
+  .header-inner { padding: 6px 12px; }
+
+  /* Stats bar em 2x2 */
+  .stats-bar { grid-template-columns: 1fr 1fr !important; }
+
+  /* Modal ocupa tela toda */
+  #modal-content, [id$="-modal-overlay"] > div {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-height: 50vh;
+    border-radius: 20px 20px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    top: auto !important;
+    margin: 0 !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -482,11 +562,11 @@ body {
     <div style="display:grid;gap:14px;">
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Plantonista <span style="color:var(--erro)">*</span></label>
-        <input id="lm-f-nome" type="text" placeholder="Nome completo" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="lm-f-nome" type="text" placeholder="Nome completo" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Tipo de afastamento <span style="color:var(--erro)">*</span></label>
-        <select id="lm-f-tipo" onchange="lmTipoChange()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <select id="lm-f-tipo" onchange="lmTipoChange()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
           <option value="">Selecione…</option>
           <option value="lm">Licença-maternidade (120 dias)</option>
           <option value="gestacional">Afastamento gestacional — noturnos (≥ 32 semanas)</option>
@@ -498,7 +578,7 @@ body {
       <div id="lm-f-bloco-lm" style="display:none;gap:10px;flex-direction:column;">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Data de início da LM <span style="color:var(--erro)">*</span></label>
-          <input id="lm-f-inicio" type="date" onchange="lmCalcFim()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="lm-f-inicio" type="date" onchange="lmCalcFim()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
           <div id="lm-f-fim-preview" style="font-size:12px;color:var(--verde);margin-top:4px;"></div>
         </div>
       </div>
@@ -506,11 +586,11 @@ body {
       <div id="lm-f-bloco-gest" style="display:none;gap:10px;flex-direction:column;">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Semanas de gestação</label>
-          <input id="lm-f-semanas" type="number" min="28" max="42" placeholder="Ex: 34" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="lm-f-semanas" type="number" min="28" max="42" placeholder="Ex: 34" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Data de início do afastamento <span style="color:var(--erro)">*</span></label>
-          <input id="lm-f-inicio-gest" type="date" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="lm-f-inicio-gest" type="date" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
         <div style="background:var(--info-bg);border-left:3px solid var(--info);border-radius:0 8px 8px 0;padding:9px 12px;font-size:12px;color:var(--info);">
           Afastamento restrito aos <strong>plantões noturnos</strong>. A plantonista continua elegível para turnos diurnos.
@@ -520,21 +600,21 @@ body {
       <div id="lm-f-bloco-disc" style="display:none;gap:10px;flex-direction:column;">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Data de início <span style="color:var(--erro)">*</span></label>
-          <input id="lm-f-inicio-disc" type="date" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="lm-f-inicio-disc" type="date" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Data de retorno previsto</label>
-          <input id="lm-f-retorno-disc" type="text" placeholder="Ex: 03/06/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="lm-f-retorno-disc" type="text" placeholder="Ex: 03/06/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
       </div>
       <!-- Campos estruturados de plantão → vão direto para a Escala Semanal -->
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Hospital / Serviço <span style="color:var(--erro)">*</span></label>
-        <input id="lm-f-hospital" type="text" placeholder="Ex: HAM — Hemodinâmica, IMIP Maternidade…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="lm-f-hospital" type="text" placeholder="Ex: HAM — Hemodinâmica, IMIP Maternidade…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Slot / Descrição da vaga <span style="color:var(--erro)">*</span></label>
-        <input id="lm-f-slot" type="text" placeholder="Ex: 1° Reserva diurno, 12h Hemio, COB Sáb noturno…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="lm-f-slot" type="text" placeholder="Ex: 1° Reserva diurno, 12h Hemio, COB Sáb noturno…" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Dias da semana afetados <span style="color:var(--erro)">*</span></label>
@@ -551,7 +631,7 @@ body {
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Turno <span style="color:var(--erro)">*</span></label>
-        <select id="lm-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <select id="lm-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
           <option value="">Selecione…</option>
           <option value="Diurno (07h–19h)">Diurno (07h–19h)</option>
           <option value="Noturno (19h–07h)">Noturno (19h–07h)</option>
@@ -561,7 +641,7 @@ body {
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Observações</label>
-        <input id="lm-f-obs" type="text" placeholder="Opcional" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="lm-f-obs" type="text" placeholder="Opcional" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
     </div>
     <div id="lm-modal-erro" style="display:none;color:var(--erro);font-size:13px;margin-top:10px;"></div>
@@ -639,7 +719,7 @@ body {
     <button class="filtro-btn" onclick="vgSetFiltro('aberta',this)">Abertas</button>
     <button class="filtro-btn" onclick="vgSetFiltro('lm',this)">LM / Afastamento</button>
     <button class="filtro-btn" onclick="vgSetFiltro('preenchida',this)">Preenchidas</button>
-    <input class="busca-input" id="vg-busca" placeholder="Buscar hospital ou dia…" oninput="vgRender()" style="flex:1;min-width:160px;padding:7px 13px;border:1.5px solid var(--cinza-1);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:13px;">
+    <input class="busca-input" id="vg-busca" placeholder="Buscar hospital ou dia…" oninput="vgRender()" style="flex:1;min-width:160px;padding:7px 13px;border:1.5px solid var(--cinza-1);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:16px;">
     <button onclick="vgAbrirModalNova()" style="margin-left:auto;background:var(--verde);color:white;border:none;border-radius:8px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Nova vaga</button>
   </div>
 
@@ -659,7 +739,7 @@ body {
       <!-- Hospital: select fechado -->
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Hospital / Serviço <span style="color:var(--erro)">*</span></label>
-        <select id="vg-f-hospital-sel" onchange="vgHospitalChange()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <select id="vg-f-hospital-sel" onchange="vgHospitalChange()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
           <option value="">— Selecione o local —</option>
           <optgroup label="Reservas">
             <option>Reservas — Diurno</option>
@@ -733,7 +813,7 @@ body {
           <option value="__outro__">Outro (não listado)</option>
         </select>
         <!-- Campo livre aparece só quando "Outro" é selecionado -->
-        <input id="vg-f-hospital-txt" type="text" placeholder="Descreva o local" style="width:100%;margin-top:6px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;display:none;">
+        <input id="vg-f-hospital-txt" type="text" placeholder="Descreva o local" style="width:100%;margin-top:6px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;display:none;">
       </div>
 
       <!-- Slot / Descrição -->
@@ -751,14 +831,14 @@ body {
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Descrição do slot <span style="font-size:11px;color:var(--cinza-3);font-weight:400;text-transform:none;">(opcional)</span></label>
-        <input id="vg-f-slot" type="text" placeholder="Ex: Sala 01, CC, SRPA..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="vg-f-slot" type="text" placeholder="Ex: Sala 01, CC, SRPA..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
 
       <!-- Duração + Tipo -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Duração / Período <span style="color:var(--erro)">*</span></label>
-          <select id="vg-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <select id="vg-f-turno" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
             <option value="12h Diurno">12h — Diurno (07h–19h)</option>
             <option value="12h Noturno">12h — Noturno (19h–07h)</option>
             <option value="6h Manhã (07h–13h)">6h — Manhã (07h–13h)</option>
@@ -767,7 +847,7 @@ body {
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Tipo de vaga <span style="color:var(--erro)">*</span></label>
-          <select id="vg-f-tipo" onchange="vgToggleLMFields()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <select id="vg-f-tipo" onchange="vgToggleLMFields()" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
             <option value="vago">Vaga Estrutural (VAGO)</option>
             <option value="vago_quinzenal">Vaga Quinzenal</option>
             <option value="lm">Licença Maternidade</option>
@@ -795,18 +875,18 @@ body {
       <div id="vg-f-lm-campos" style="display:none;flex-direction:column;gap:12px;">
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Plantonista original</label>
-          <input id="vg-f-plantonista" type="text" placeholder="Nome do plantonista afastado" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="vg-f-plantonista" type="text" placeholder="Nome do plantonista afastado" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Retorno previsto</label>
-          <input id="vg-f-retorno" type="text" placeholder="Ex: 17/04/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+          <input id="vg-f-retorno" type="text" placeholder="Ex: 17/04/2026 ou Em aberto" style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
         </div>
       </div>
 
       <!-- Observações -->
       <div>
         <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;">Observações</label>
-        <input id="vg-f-obs" type="text" placeholder="Opcional — início, detalhes..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;">
+        <input id="vg-f-obs" type="text" placeholder="Opcional — início, detalhes..." style="width:100%;margin-top:5px;padding:9px 12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:16px;">
       </div>
     </div>
 
@@ -1358,6 +1438,9 @@ function mudarTab(tab) {
   document.querySelectorAll(".tela").forEach(t => t.classList.remove("vis"));
   document.getElementById("tab-" + tab).classList.add("ativa");
   document.getElementById("tela-" + tab).classList.add("vis");
+  // Scroll tab ativa para o centro na barra (mobile)
+  const tabEl = document.getElementById("tab-" + tab);
+  if (tabEl) tabEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
   if (tab === "avisos") apRender();
   if (tab === "vagas")  vgRender();
   if (tab === "escala") esRender();
