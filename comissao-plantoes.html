@@ -1077,22 +1077,40 @@ async function carregarDados() {
     const resp = await fetch(url);
     const json = await resp.json();
     if (json.ok && json.dados) {
-      // Normaliza campos — garante que exigeRep, dataRep, turnoRep, statusRep existem
-      acionamentos = json.dados.map(a => ({
-        ...a,
-        exigeRep:      a.exigeRep  || a.exige_rep  || false,
-        dataRep:       a.dataRep   || a.data_rep   || a.dataReposicao || "",
-        turnoRep:      a.turnoRep  || a.turno_rep  || a.turnoReposicao || "",
-        statusRep:     a.statusRep || a.status_rep || "Pendente",
-        statusAtestado:a.statusAtestado || a.status_atestado || "Pendente",
-        prazo48h:      a.prazo48h  || a.prazo_48h  || "",
-        nome:          a.nome      || a.plantonista || "",
-        motivo:        a.motivo    || "",
-        hospital:      a.hospital  || "",
-        dataPlantao:   a.dataPlantao || a.data_plantao || "",
-        turno:         a.turno     || "",
-        protocolo:     a.protocolo || "",
-      }));
+      acionamentos = json.dados.map(a => {
+        const dataRep    = String(a.dataRep || a.data_rep || a.dataReposicao || "").trim().replace(/^—$/, "");
+        const turnoRep   = String(a.turnoRep || a.turno_rep || a.turnoReposicao || "").trim();
+        const duracaoRaw = String(a.duracao || "").trim();
+
+        // exigeRep: verdadeiro se GS diz SIM, duração < 72h, ou há data de reposição preenchida
+        const exigeRepRaw = a.exigeRep || a.exige_rep;
+        const exigeRep = exigeRepRaw === true
+          || String(exigeRepRaw).trim().toUpperCase() === "SIM"
+          || duracaoRaw === "< 72h" || duracaoRaw === "menor72" || duracaoRaw === "lt72"
+          || (dataRep !== "" && dataRep !== "—");
+
+        // statusRep: quando exige, nunca retorna N/A
+        const statusRepRaw = String(a.statusRep || a.status_rep || "").trim();
+        const statusRep = exigeRep
+          ? (statusRepRaw === "Cumprida" ? "Cumprida" : "Pendente")
+          : "N/A";
+
+        return {
+          ...a,
+          exigeRep,
+          dataRep,
+          turnoRep,
+          statusRep,
+          statusAtestado: a.statusAtestado || a.status_atestado || "Pendente",
+          prazo48h:       a.prazo48h  || a.prazo_48h  || "",
+          nome:           a.nome      || a.plantonista || "",
+          motivo:         a.motivo    || "",
+          hospital:       a.hospital  || "",
+          dataPlantao:    String(a.dataPlantao || a.data_plantao || "").replace(/^(\d{4})-(\d{2})-(\d{2}).*$/, "$3/$2/$1"),
+          turno:          a.turno     || "",
+          protocolo:      a.protocolo || "",
+        };
+      });
     }
   } catch(e) {
     console.warn("Usando dados locais:", e);
