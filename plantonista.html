@@ -767,6 +767,36 @@ table { min-width: 600px; }
         <div class="msg-erro" id="erro-at-arquivo">Selecione o arquivo do atestado.</div>
       </div>
 
+      <!-- Toggle de reposição — aparece quando protocolo é localizado e exige rep -->
+      <div id="at-bloco-rep" style="display:none;">
+        <div style="background:var(--alerta-bg);border-left:3px solid var(--alerta);border-radius:0 var(--r) var(--r) 0;padding:12px 14px;margin-bottom:14px;">
+          <strong style="color:var(--alerta);font-size:14px;">⚠️ Atestado &lt; 72h — reposição obrigatória</strong>
+          <p style="font-size:13px;color:#7c3200;margin-top:4px;">Defina abaixo a data e o turno em que você irá repor o plantão.</p>
+        </div>
+        <div class="dois-col">
+          <div class="campo-grupo">
+            <label for="at-data-rep">Data da reposição <span class="req">*</span></label>
+            <input type="date" id="at-data-rep">
+            <div class="msg-erro" id="erro-at-data-rep">Informe a data da reposição.</div>
+          </div>
+          <div class="campo-grupo">
+            <label for="at-turno-rep">Turno da reposição <span class="req">*</span></label>
+            <select id="at-turno-rep">
+              <option value="">Selecione…</option>
+              <option>Diurno (07h–19h)</option>
+              <option>Noturno (19h–07h)</option>
+              <option>Manhã (07h–13h)</option>
+              <option>Tarde (13h–19h)</option>
+            </select>
+            <div class="msg-erro" id="erro-at-turno-rep">Selecione o turno.</div>
+          </div>
+        </div>
+        <div class="campo-grupo">
+          <label for="at-hospital-rep">Hospital da reposição</label>
+          <input type="text" id="at-hospital-rep" placeholder="Mesmo hospital ou outro (opcional)">
+        </div>
+      </div>
+
       <div class="btn-row">
         <button class="btn-enviar" id="btn-at-enviar" onclick="enviarAtestado()">
           <span class="btn-txt">Enviar atestado</span>
@@ -1236,6 +1266,8 @@ async function enviarAcionamento() {
 }
 
 // ════ MÓDULO B: ENVIAR ATESTADO ════
+let _atDadosProtocolo = null; // dados retornados pelo buscarProtocolo
+
 async function buscarProtocolo() {
   const prot = val("at-protocolo");
   if (!/^AC-\d{8}-\d{6}$/.test(prot)) {
@@ -1249,12 +1281,35 @@ async function buscarProtocolo() {
     const resp = await fetch(url);
     const json = await resp.json();
     if (json.encontrado) {
+      _atDadosProtocolo = json.dados;
       campo("at-nome").value  = json.dados.nome  || "";
       campo("at-email").value = json.dados.email || "";
-      campo("at-vinculo-info").textContent = `${json.dados.nome} · ${json.dados.hospital} · ${json.dados.motivo}`;
+      const exigeRep = json.dados.exigeRep ||
+        json.dados.duracaoAtestado === "menor72" ||
+        json.dados.duracaoAtestado === "lt72";
+      campo("at-vinculo-info").innerHTML =
+        `<strong>${json.dados.nome}</strong> · ${json.dados.hospital} · ${json.dados.motivo}` +
+        (exigeRep
+          ? ` · <span style="color:var(--alerta);font-weight:600;">⚠️ Reposição obrigatória</span>`
+          : "");
       campo("at-vinculo").classList.add("vis");
+      // Mostra bloco de reposição se o acionamento exige
+      const blocoRep = campo("at-bloco-rep");
+      if (blocoRep) {
+        blocoRep.style.display = exigeRep ? "block" : "none";
+        // Se a data de reposição já foi definida no acionamento original, pré-preenche
+        if (exigeRep && json.dados.dataRep) {
+          // Converte DD/MM/AAAA → AAAA-MM-DD para o input date
+          const parts = json.dados.dataRep.split("/");
+          if (parts.length === 3) {
+            campo("at-data-rep").value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+          if (json.dados.turnoRep) campo("at-turno-rep").value = json.dados.turnoRep;
+        }
+      }
     } else {
       marcarErro("erro-at-protocolo", true);
+      _atDadosProtocolo = null;
     }
   } catch(e) {
     // modo offline: aceita sem busca
@@ -1282,40 +1337,67 @@ async function enviarAtestado() {
   if (!campo("at-arquivo").files.length) { marcarErro("erro-at-arquivo", true); ok = false; }
   else marcarErro("erro-at-arquivo", false);
 
+  // Valida campos de reposição se bloco estiver visível
+  const blocoRep = campo("at-bloco-rep");
+  const repVisivel = blocoRep && blocoRep.style.display !== "none";
+  if (repVisivel) {
+    if (!val("at-data-rep"))  { marcarErro("erro-at-data-rep",  true); ok = false; }
+    else                        marcarErro("erro-at-data-rep",  false);
+    if (!val("at-turno-rep")) { marcarErro("erro-at-turno-rep", true); ok = false; }
+    else                        marcarErro("erro-at-turno-rep", false);
+  }
+
   if (!ok) return;
 
   const btn = campo("btn-at-enviar");
   btn.classList.add("loading"); btn.disabled = true;
 
   try {
-    const file = campo("at-arquivo").files[0];
+    const file   = campo("at-arquivo").files[0];
     const base64 = await lerArquivoBase64(file);
     const agora  = new Date();
 
     const dados = {
-      action:       "receberAtestado",
-      protocolo:    prot,
-      nome:         val("at-nome"),
-      email:        val("at-email"),
+      action:        "receberAtestado",
+      protocolo:     prot,
+      nome:          val("at-nome"),
+      email:         val("at-email"),
       base64Arquivo: base64,
-      tipoArquivo:  file.type,
-      nomeArquivo:  file.name,
-      dataHora:     formatarDataHora(agora),
+      tipoArquivo:   file.type,
+      nomeArquivo:   file.name,
+      dataHora:      formatarDataHora(agora),
     };
 
+    // Inclui reposição se definida neste fluxo
+    if (repVisivel && val("at-data-rep")) {
+      dados.dataReposicao  = val("at-data-rep");    // AAAA-MM-DD
+      dados.turnoReposicao = val("at-turno-rep");
+      dados.hospitalRep    = val("at-hospital-rep") || "";
+      dados.atualizarRep   = true; // sinaliza ao GS para atualizar a linha
+    }
+
     await postar(dados);
+
+    const linhasComp = [
+      ["Plantonista", val("at-nome")],
+      ["Protocolo",   prot],
+      ["Arquivo",     file.name],
+      ["Enviado em",  formatarDataHora(agora)],
+    ];
+    const alertasComp = [];
+    if (repVisivel && val("at-data-rep")) {
+      const p = n => String(n).padStart(2,"0");
+      const [y,m,d] = val("at-data-rep").split("-");
+      linhasComp.push(["Reposição", `${p(d)}/${p(m)}/${y} — ${val("at-turno-rep")}`]);
+      alertasComp.push(`📅 Reposição registrada para <strong>${p(d)}/${p(m)}/${y}</strong> — a Comissão será notificada.`);
+    }
 
     mostrarComprovante({
       titulo:    "Atestado enviado!",
       subtitulo: "A Comissão de Plantões recebeu o documento.",
       protocolo: prot,
-      linhas: [
-        ["Plantonista", val("at-nome")],
-        ["Protocolo",   prot],
-        ["Arquivo",     file.name],
-        ["Enviado em",  formatarDataHora(agora)],
-      ],
-      alertas: []
+      linhas:    linhasComp,
+      alertas:   alertasComp,
     });
 
   } catch(e) {
