@@ -1181,12 +1181,41 @@ async function carregarAvisosPrevios() {
     const resp = await fetch(url);
     const json = await resp.json();
     if (json.ok && json.dados && json.dados.length > 0) {
-      // Mescla: não sobrescreve os mock se não houver dados reais
-      avisosPrevios = json.dados;
+      avisosPrevios = json.dados.map(ap => {
+        // Normaliza dataVencISO: garante que é AAAA-MM-DD para new Date() funcionar
+        let vencISO = String(ap.dataVencISO || "").trim();
+        // Se vier como ISO com horário (2026-07-08T03:00:00.000Z), pega só a data
+        if (vencISO.includes("T")) vencISO = vencISO.split("T")[0];
+        // Se vier como DD/MM/AAAA, converte
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(vencISO)) {
+          const p = vencISO.split("/");
+          vencISO = p[2] + "-" + p[1] + "-" + p[0];
+        }
+
+        // Normaliza dataVencimento para exibição DD/MM/AAAA
+        let vencFmt = String(ap.dataVencimento || "").trim();
+        if (vencFmt.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(vencFmt)) {
+          const p = vencFmt.split("T")[0].split("-");
+          vencFmt = p[2] + "/" + p[1] + "/" + p[0];
+        }
+
+        // CRM: remove "-undefined" ou "undefined"
+        let crm = String(ap.crm || "").replace(/-?undefined/gi, "").trim();
+
+        return {
+          ...ap,
+          dataVencISO:    vencISO,
+          dataVencimento: vencFmt,
+          crm:            crm,
+          prazoDias:      Number(ap.prazoDias) || 90,
+          status:         ap.status || "Ativo",
+          frequencia:     ap.frequencia || "",
+        };
+      });
     }
     atualizarBadge();
     apRender();
-  } catch(e) { /* usa dados locais */ }
+  } catch(e) { console.warn("AP erro:", e); }
 }
 
 // ── Carrega vagas estruturais 100% do Sheets
@@ -2649,7 +2678,13 @@ let avisosPrevios = [];
 let apFiltro = "todos";
 
 function apDiasRest(ap) {
-  return Math.ceil((new Date(ap.dataVencISO) - new Date()) / 86400000);
+  if (!ap.dataVencISO) return 999;
+  // Garante formato AAAA-MM-DD sem horário (evita problema de fuso ao fazer new Date)
+  const iso = String(ap.dataVencISO).split("T")[0];
+  // new Date("AAAA-MM-DD") interpreta como UTC — ajusta para meio-dia local
+  const venc = new Date(iso + "T12:00:00");
+  if (isNaN(venc.getTime())) return 999;
+  return Math.ceil((venc - new Date()) / 86400000);
 }
 
 function apUrgencia(ap) {
@@ -2712,7 +2747,7 @@ function apRender() {
       <div class="acion-header">
         <div class="acion-avatar" style="background:${urg==="critico"||urg==="vencido"?"var(--erro-bg)":urg==="urgente"?"var(--alerta-bg)":urg==="encerrado"?"var(--cinza-1)":"var(--verde-light)"};color:${urg==="critico"||urg==="vencido"?"var(--erro)":urg==="urgente"?"var(--alerta)":urg==="encerrado"?"var(--cinza-4)":"var(--verde)"};">${ap.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</div>
         <div class="acion-info">
-          <div class="acion-nome">${ap.nome} <span style="font-weight:400;font-size:12px;color:var(--cinza-4);">${ap.crm}</span></div>
+          <div class="acion-nome">${ap.nome}${ap.crm ? '<span style="font-weight:400;font-size:12px;color:var(--cinza-4);margin-left:6px;">CRM ' + ap.crm + '</span>' : ''}</div>
           <div class="acion-sub">${ap.hospital} · ${ap.turno} · ${ap.diasSemana}${ap.frequencia ? ' · ' + ap.frequencia : ''}</div>
           <div class="acion-tags">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">⏱ ${tagTxt}</span>
@@ -2733,8 +2768,7 @@ function apRender() {
       </div>` : ""}
       <div class="acion-acoes">
         ${ap.status==="Ativo" ? `
-        <button class="btn-acao btn-confirmar-atestado" onclick="apEncerrar('${ap.protocolo}')">✓ Voluntário assumiu</button>
-        <button class="btn-acao" style="background:var(--info-bg);color:var(--info);" onclick="apReserva('${ap.protocolo}')">⚡ Cobrir com reserva</button>` : ""}
+        <button class="btn-acao btn-confirmar-atestado" onclick="apEncerrar('${ap.protocolo}')">✓ Voluntário assumiu</button>` : ""}
         <span style="margin-left:auto;font-size:11px;color:var(--cinza-4);font-family:monospace;">${ap.protocolo}</span>
       </div>
     </div>`;
