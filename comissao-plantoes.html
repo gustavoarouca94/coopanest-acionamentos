@@ -1416,6 +1416,22 @@ function abrirDetalhe(protocolo) {
       <h4>Documentação</h4>
       <div class="detalhe-grid">
         <div class="dl-item"><div class="dli-label">Status atestado</div><div class="dli-valor">${statusPill(a.statusAtestado || "N/A")}</div></div>
+        ${a.linkAtestado ? `
+        <div class="dl-item">
+          <div class="dli-label">Arquivo do atestado</div>
+          <div class="dli-valor">
+            <a href="${a.linkAtestado}" target="_blank" rel="noopener"
+              style="display:inline-flex;align-items:center;gap:6px;background:var(--verde);color:white;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+              📄 Abrir atestado no Drive
+            </a>
+          </div>
+        </div>` : a.statusAtestado && a.statusAtestado.includes("Recebido") ? `
+        <div class="dl-item">
+          <div class="dli-label">Arquivo do atestado</div>
+          <div class="dvi-valor" style="font-size:12px;color:var(--cinza-4);">
+            Recebido via e-mail — link não disponível nesta versão
+          </div>
+        </div>` : ""}
         ${a.exigeRep ? `
         <div class="dl-item"><div class="dli-label">Reposição</div><div class="dli-valor">${statusPill(a.statusRep)}</div></div>
         <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep && a.dataRep !== "—" ? '<strong style="color:var(--verde)">📅 ' + a.dataRep + '</strong>' : '<span style="color:var(--erro);font-weight:600;">Não agendada — cobrar plantonista</span>'}</div></div>
