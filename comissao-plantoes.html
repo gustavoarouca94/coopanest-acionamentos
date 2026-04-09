@@ -911,15 +911,69 @@ table { min-width: 600px; }
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--texto);">Reposições agendadas</div>
-        <div style="font-size:12px;color:var(--cinza-4);">Plantonistas que pagarão falta em turnos específicos — já serão o reserva acionado naquele dia</div>
+        <div style="font-size:12px;color:var(--cinza-4);">O plantonista que repõe <strong>já é o reserva</strong> daquele turno — reduz a pressão sobre os demais</div>
       </div>
-      <button onclick="esAddReposicao()" style="background:var(--verde);color:white;border:none;border-radius:8px;padding:7px 14px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">+ Adicionar reposição</button>
+      <button onclick="esAbrirModalRep()" style="background:var(--verde);color:white;border:none;border-radius:8px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;min-height:44px;">+ Adicionar reposição</button>
     </div>
     <div id="es-reposicoes-lista" style="display:flex;flex-direction:column;gap:6px;"></div>
   </div>
 
   <!-- Calendário semanal -->
   <div id="es-calendario" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  </div>
+</div>
+
+<!-- Modal: adicionar reposição manual -->
+<div id="es-rep-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-end;justify-content:center;">
+  <div style="background:white;border-radius:20px 20px 0 0;padding:26px 22px 32px;width:min(520px,100vw);box-shadow:0 -4px 32px rgba(0,0,0,.18);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--verde-dark);font-family:'DM Serif Display',serif;">Registrar reposição</div>
+        <div style="font-size:12px;color:var(--cinza-4);margin-top:2px;">O plantonista escolhe o local no dia, conforme hierarquia</div>
+      </div>
+      <button onclick="esFecharModalRep()" style="background:var(--cinza-1);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+
+    <div style="display:grid;gap:14px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px;">Plantonista <span style="color:var(--erro)">*</span></label>
+        <input id="es-rep-nome" type="text" placeholder="Nome do plantonista que vai repor"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--cinza-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:16px;box-sizing:border-box;">
+        <div id="es-rep-erro-nome" style="display:none;color:var(--erro);font-size:12px;margin-top:4px;">Informe o nome.</div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px;">Data da reposição <span style="color:var(--erro)">*</span></label>
+        <input id="es-rep-data" type="date" onchange="esRepCalcDia()"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--cinza-2);border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:16px;box-sizing:border-box;">
+        <div id="es-rep-dia-preview" style="font-size:12px;color:var(--verde);margin-top:4px;font-weight:600;"></div>
+        <div id="es-rep-erro-data" style="display:none;color:var(--erro);font-size:12px;margin-top:4px;">Informe a data.</div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px;">Turno <span style="color:var(--erro)">*</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="es-rep-turno-wrap">
+          <label id="es-rep-t-d" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--cinza-2);border-radius:var(--r);cursor:pointer;transition:all .15s;">
+            <input type="radio" name="es-rep-turno" value="Diurno (07h–19h)" onchange="esRepTurnoChange()" style="accent-color:var(--verde);width:18px;height:18px;">
+            <div><div style="font-size:14px;font-weight:600;">Diurno</div><div style="font-size:11px;color:var(--cinza-4);">07h – 19h</div></div>
+          </label>
+          <label id="es-rep-t-n" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--cinza-2);border-radius:var(--r);cursor:pointer;transition:all .15s;">
+            <input type="radio" name="es-rep-turno" value="Noturno (19h–07h)" onchange="esRepTurnoChange()" style="accent-color:var(--verde);width:18px;height:18px;">
+            <div><div style="font-size:14px;font-weight:600;">Noturno</div><div style="font-size:11px;color:var(--cinza-4);">19h – 07h</div></div>
+          </label>
+        </div>
+        <div id="es-rep-erro-turno" style="display:none;color:var(--erro);font-size:12px;margin-top:4px;">Selecione o turno.</div>
+      </div>
+
+      <div style="background:var(--amarelo-bg);border-left:3px solid var(--amarelo);border-radius:0 var(--r) var(--r) 0;padding:10px 14px;font-size:12px;color:#5a3d00;">
+        <strong>Como funciona:</strong> se houver apenas 1 acionamento no turno, este plantonista será o reserva acionado. Se houver mais de um, poderá escolher o local conforme sua hierarquia na escala.
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="esFecharModalRep()" style="flex:1;background:var(--cinza-1);color:var(--texto);border:none;border-radius:var(--r);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;min-height:44px;">Cancelar</button>
+      <button onclick="esSalvarRep()" style="flex:2;background:var(--verde);color:white;border:none;border-radius:var(--r);padding:13px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;">✓ Confirmar reposição</button>
+    </div>
   </div>
 </div>
 
@@ -1792,25 +1846,75 @@ function esBuscarReposicoes() {
     .catch(() => {});
 }
 
-function esAddReposicao() {
-  const nome  = prompt("Nome do plantonista que irá repor:");
-  if (!nome || !nome.trim()) return;
-  const data  = prompt("Data da reposição (ex: 07/04/2026):");
-  if (!data) return;
-  const turno = prompt("Turno (Diurno 07h–19h ou Noturno 19h–07h):");
-  if (!turno) return;
-  const hosp  = prompt("Hospital da reposição:");
-  if (!hosp) return;
+function esAbrirModalRep() {
+  document.getElementById("es-rep-nome").value = "";
+  document.getElementById("es-rep-data").value = "";
+  document.getElementById("es-rep-dia-preview").textContent = "";
+  document.querySelectorAll('input[name="es-rep-turno"]').forEach(r => r.checked = false);
+  ["es-rep-erro-nome","es-rep-erro-data","es-rep-erro-turno"].forEach(id => {
+    document.getElementById(id).style.display = "none";
+  });
+  ["es-rep-t-d","es-rep-t-n"].forEach(id => {
+    document.getElementById(id).style.borderColor = "var(--cinza-2)";
+    document.getElementById(id).style.background   = "white";
+  });
+  document.getElementById("es-rep-modal-overlay").style.display = "flex";
+  setTimeout(() => document.getElementById("es-rep-nome").focus(), 100);
+}
+
+function esFecharModalRep() {
+  document.getElementById("es-rep-modal-overlay").style.display = "none";
+}
+
+function esRepCalcDia() {
+  const v = document.getElementById("es-rep-data").value;
+  if (!v) { document.getElementById("es-rep-dia-preview").textContent = ""; return; }
+  const DIAS = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+  const d = new Date(v + "T12:00:00");
+  const p = n => String(n).padStart(2,"0");
+  document.getElementById("es-rep-dia-preview").textContent =
+    `📅 ${DIAS[d.getDay()]}, ${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
+}
+
+function esRepTurnoChange() {
+  ["es-rep-t-d","es-rep-t-n"].forEach(id => {
+    const el  = document.getElementById(id);
+    const inp = el.querySelector("input");
+    el.style.borderColor = inp.checked ? "var(--verde)" : "var(--cinza-2)";
+    el.style.background  = inp.checked ? "var(--verde-light)" : "white";
+  });
+}
+
+function esSalvarRep() {
+  const nome   = document.getElementById("es-rep-nome").value.trim();
+  const data   = document.getElementById("es-rep-data").value;
+  const turnoEl= document.querySelector('input[name="es-rep-turno"]:checked');
+  let ok = true;
+
+  if (!nome) { document.getElementById("es-rep-erro-nome").style.display  = "block"; ok = false; }
+  else          document.getElementById("es-rep-erro-nome").style.display  = "none";
+  if (!data) { document.getElementById("es-rep-erro-data").style.display  = "block"; ok = false; }
+  else          document.getElementById("es-rep-erro-data").style.display  = "none";
+  if (!turnoEl) { document.getElementById("es-rep-erro-turno").style.display = "block"; ok = false; }
+  else            document.getElementById("es-rep-erro-turno").style.display = "none";
+  if (!ok) return;
+
+  const p = n => String(n).padStart(2,"0");
+  const d = new Date(data + "T12:00:00");
+  const dataFmt = `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
 
   esReposicoes.push({
-    id: "REP-" + Date.now(),
-    plantonista: nome.trim(),
-    hospital: hosp.trim(),
-    dataRep: data.trim(),
-    turnoRep: turno.trim(),
-    fonte: "manual"
+    id:          "REP-" + Date.now(),
+    plantonista: nome,
+    hospital:    "", // não necessário — escolhido no dia conforme hierarquia
+    dataRep:     dataFmt,
+    turnoRep:    turnoEl.value,
+    fonte:       "manual",
   });
+
+  esFecharModalRep();
   esRender();
+  mostrarToast(`✓ Reposição de ${nome} registrada para ${dataFmt}`);
 }
 
 function esRemoverReposicao(id) {
@@ -2027,20 +2131,45 @@ function esRender() {
 
       var repsHTML = reps.map(function(r) {
         var dataF = r.dataRep || "—";
-        return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--amarelo-bg);border-left:2px solid var(--amarelo);border-radius:0 6px 6px 0;margin-bottom:4px;">' +
-          '<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--amarelo);color:white;white-space:nowrap;">REP</span>' +
+        // Conta quantos acionamentos fixos há neste turno para dar contexto
+        var nFixos = fixos.length;
+        var contextMsg = nFixos === 0
+          ? 'Nenhum acionamento previsto — aguardando falta espontânea'
+          : nFixos === 1
+            ? 'Já é o reserva deste turno'
+            : 'Escolhe o local conforme hierarquia (' + nFixos + ' vagas abertas)';
+        return '<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;' +
+            'background:linear-gradient(135deg,#fef9e7,#fefbea);' +
+            'border:1.5px solid var(--amarelo);border-radius:8px;margin-bottom:4px;">' +
+          '<div style="flex-shrink:0;text-align:center;">' +
+            '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;' +
+              'background:var(--amarelo);color:white;display:block;white-space:nowrap;">REPÕE</span>' +
+          '</div>' +
           '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:12px;font-weight:600;color:var(--texto);">'+r.plantonista+'</div>' +
-          '<div style="font-size:11px;color:var(--cinza-4);">'+r.hospital+'</div>' +
-          '<div style="font-size:11px;font-weight:600;color:var(--amarelo);">📅 '+dataF+' · '+r.turnoRep+'</div>' +
-          '</div></div>';
+            '<div style="font-size:12px;font-weight:700;color:var(--texto);">' + r.plantonista + '</div>' +
+            '<div style="font-size:11px;font-weight:600;color:var(--amarelo);margin-top:1px;">' +
+              '📅 ' + dataF + ' — ' + r.turnoRep +
+            '</div>' +
+            '<div style="font-size:10px;color:var(--cinza-4);margin-top:1px;font-style:italic;">' +
+              contextMsg +
+            '</div>' +
+          '</div>' +
+          (r.fonte === "manual"
+            ? '<button onclick="esRemoverReposicao(\'' + r.id + '\')" ' +
+                'style="background:none;border:none;color:var(--cinza-3);cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;">✕</button>'
+            : '') +
+          '</div>';
       }).join("");
 
       html += '<div style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);overflow:hidden;margin-bottom:10px;">' +
         '<div style="background:'+pressaoCor+';padding:8px 14px;display:flex;align-items:center;justify-content:space-between;">' +
         '<span style="font-size:13px;font-weight:700;color:white;">'+dia+' — '+turno.label+'</span>' +
-        '<span style="background:rgba(255,255,255,.25);color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">'+
-          totalAcion+' vaga'+( totalAcion===1?"":"s")+' · '+reps.length+' rep'+'</span>' +
+        '<div style="display:flex;gap:6px;align-items:center;">' +
+          (totalAcion > 0 ? '<span style="background:rgba(255,255,255,.25);color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">'+
+            totalAcion + (totalAcion===1?' vaga':' vagas')+'</span>' : '') +
+          (reps.length > 0 ? '<span style="background:var(--amarelo);color:white;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">'+
+            reps.length + (reps.length===1?' repõe':' repõem')+'</span>' : '') +
+        '</div>' +
         '</div>' +
         '<div style="padding:10px 10px 6px;">'+fixosHTML+repsHTML+'</div>' +
         '</div>';
