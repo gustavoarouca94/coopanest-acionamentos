@@ -833,22 +833,16 @@ table { min-width: 600px; }
         </div>
       </div>
 
-      <div class="dois-col">
-        <div class="campo-grupo">
-          <label for="ap-email">E-mail <span class="req">*</span></label>
-          <input type="email" id="ap-email" placeholder="seu@email.com">
-          <div class="msg-erro" id="erro-ap-email">E-mail inválido.</div>
-        </div>
-        <div class="campo-grupo">
-          <label for="ap-telefone">Telefone / WhatsApp</label>
-          <input type="tel" id="ap-telefone" placeholder="(81) 9xxxx-xxxx">
-        </div>
+      <div class="campo-grupo">
+        <label for="ap-email">E-mail <span class="req">*</span></label>
+        <input type="email" id="ap-email" placeholder="seu@email.com">
+        <div class="msg-erro" id="erro-ap-email">E-mail inválido.</div>
       </div>
 
       <div class="dois-col">
         <div class="campo-grupo">
           <label for="ap-hospital">Hospital / Serviço <span class="req">*</span></label>
-          <select id="ap-hospital">
+          <select id="ap-hospital" onchange="apHospitalChange()">
             <option value="">Selecione…</option>
             <option>Hospital da Restauração — Urgência (HR)</option>
             <option>Hospital da Restauração — Imagem</option>
@@ -873,6 +867,7 @@ table { min-width: 600px; }
             <option>HUOC — SRPA Bloco B</option>
             <option>HUOC — Imagem</option>
             <option>HUOC — Braquiterapia</option>
+            <option>HUOC — Sobreaviso</option>
             <option>PROCAPE</option>
             <option>HSE (SRPA + Urgências)</option>
             <option>FAV Iputinga</option>
@@ -924,8 +919,35 @@ table { min-width: 600px; }
       </div>
 
       <div class="campo-grupo">
+        <label>Frequência do plantão <span class="req">*</span></label>
+        <div class="hint">Como este plantão está organizado na sua escala</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px;" id="ap-freq-wrap">
+          <label id="ap-freq-semanal" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border:2px solid var(--cinza-2);border-radius:var(--r);cursor:pointer;transition:all .15s;text-align:center;">
+            <input type="radio" name="ap-freq" value="Semanal" onchange="apFreqChange()" style="display:none;">
+            <span style="font-size:15px;font-weight:700;">Semanal</span>
+            <span style="font-size:11px;color:var(--cinza-4);">Todo semana</span>
+          </label>
+          <label id="ap-freq-quinzenal" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border:2px solid var(--cinza-2);border-radius:var(--r);cursor:pointer;transition:all .15s;text-align:center;">
+            <input type="radio" name="ap-freq" value="Quinzenal" onchange="apFreqChange()" style="display:none;">
+            <span style="font-size:15px;font-weight:700;">Quinzenal</span>
+            <span style="font-size:11px;color:var(--cinza-4);">A cada 2 semanas</span>
+          </label>
+          <label id="ap-freq-mensal" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border:2px solid var(--cinza-2);border-radius:var(--r);cursor:pointer;transition:all .15s;text-align:center;">
+            <input type="radio" name="ap-freq" value="Mensal" onchange="apFreqChange()" style="display:none;">
+            <span style="font-size:15px;font-weight:700;">Mensal</span>
+            <span style="font-size:11px;color:var(--cinza-4);">Uma vez ao mês</span>
+          </label>
+        </div>
+        <div class="msg-erro" id="erro-ap-freq">Selecione a frequência.</div>
+      </div>
+
+      <div class="campo-grupo">
         <label>Prazo de aviso prévio <span class="req">*</span></label>
-        <div class="prazo-sel">
+        <!-- Card FAV 15 dias — aparece apenas quando FAV Iputinga selecionado -->
+        <div id="ap-prazo-fav-info" style="display:none;background:#eaf1fb;border-left:3px solid var(--info);border-radius:0 var(--r) var(--r) 0;padding:10px 14px;font-size:13px;color:var(--info);margin-bottom:10px;">
+          <strong>⚡ Exceção FAV Iputinga:</strong> o prazo de aviso prévio para este plantão é de <strong>15 dias corridos</strong>, selecionado automaticamente.
+        </div>
+        <div class="prazo-sel" id="ap-prazo-sel-wrap">
           <div class="prazo-opt" id="ap-prazo-90" onclick="selecionarPrazo(90)">
             <div class="prazo-num">90</div>
             <div class="prazo-label">dias corridos</div>
@@ -1418,6 +1440,43 @@ function selecionarPrazo(dias) {
   recalcularPrazo();
 }
 
+// Frequência do plantão — destaca card selecionado
+function apFreqChange() {
+  const selecionada = document.querySelector('input[name="ap-freq"]:checked');
+  ["ap-freq-semanal","ap-freq-quinzenal","ap-freq-mensal"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const inp = el.querySelector("input");
+    const sel = inp && inp.checked;
+    el.style.borderColor  = sel ? "var(--verde)"      : "var(--cinza-2)";
+    el.style.background   = sel ? "var(--verde-light)" : "white";
+    el.style.color        = sel ? "var(--verde-dark)"  : "";
+  });
+}
+
+// Quando hospital muda — verifica se é FAV Iputinga
+function apHospitalChange() {
+  const hosp     = val("ap-hospital");
+  const ehFAV    = hosp === "FAV Iputinga";
+  const infoFAV  = campo("ap-prazo-fav-info");
+  const selWrap  = campo("ap-prazo-sel-wrap");
+
+  if (infoFAV) infoFAV.style.display  = ehFAV ? "block" : "none";
+  if (selWrap) selWrap.style.display  = ehFAV ? "none"  : "grid";
+
+  if (ehFAV) {
+    apPrazoSel = 15;
+    marcarErro("erro-ap-prazo", false);
+    recalcularPrazo();
+  } else if (apPrazoSel === 15) {
+    // Reset se mudou de FAV para outro hospital
+    apPrazoSel = null;
+    campo("ap-prazo-90").classList.remove("sel");
+    campo("ap-prazo-180").classList.remove("sel");
+    campo("ap-preview-prazo").classList.remove("vis");
+  }
+}
+
 function recalcularPrazo() {
   if (!apPrazoSel) return;
   const dataInicio = val("ap-data-inicio");
@@ -1435,6 +1494,10 @@ function recalcularPrazo() {
 
 async function enviarAvisoPrevio() {
   let ok = true;
+
+  const freqSel = document.querySelector('input[name="ap-freq"]:checked');
+  if (!freqSel) { document.getElementById("erro-ap-freq").style.display = "block"; ok = false; }
+  else            document.getElementById("erro-ap-freq").style.display = "none";
 
   [
     ["ap-nome",    "erro-ap-nome",    v => v.length > 2],
@@ -1480,6 +1543,7 @@ async function enviarAvisoPrevio() {
       setor:         val("ap-setor"),
       diasSemana:    dias.join(", "),
       turno:         val("ap-turno"),
+      frequencia:    freqSel ? freqSel.value : "",
       prazo:         apPrazoSel,
       dataInicio:    inicio,
       dataVencimento: dataVenc,
@@ -1497,6 +1561,7 @@ async function enviarAvisoPrevio() {
         ["Hospital",     dados.hospital + (dados.setor ? ` / ${dados.setor}` : "")],
         ["Dias",         dias.join(", ")],
         ["Turno",        dados.turno],
+        ["Frequência",   dados.frequencia || "—"],
         ["Prazo",        `${apPrazoSel} dias`],
         ["Início",       formatarData(inicio)],
         ["Vencimento",   formatarData(dataVenc)],
@@ -1522,6 +1587,15 @@ function limparTodos() {
    "ap-nome","ap-crm","ap-email","ap-telefone","ap-hospital","ap-setor","ap-turno","ap-data-inicio","ap-obs"
   ].forEach(id => { if(campo(id)) campo(id).value = ""; });
   document.querySelectorAll('input[name="ap-dia"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('input[name="ap-freq"]').forEach(rb => rb.checked = false);
+  ["ap-freq-semanal","ap-freq-quinzenal","ap-freq-mensal"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.style.borderColor = "var(--cinza-2)"; el.style.background = "white"; }
+  });
+  const infoFAV = campo("ap-prazo-fav-info");
+  if (infoFAV) infoFAV.style.display = "none";
+  const selWrap = campo("ap-prazo-sel-wrap");
+  if (selWrap) selWrap.style.display = "grid";
   ["bloco-atestado-ac","bloco-lm","bloco-gestacional","bloco-reposicao"].forEach(id => campo(id)?.classList.remove("vis"));
   ["a-preview","at-preview"].forEach(id => campo(id)?.classList.remove("vis"));
   campo("at-vinculo")?.classList.remove("vis");

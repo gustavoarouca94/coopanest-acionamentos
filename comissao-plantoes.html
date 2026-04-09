@@ -2713,7 +2713,7 @@ function apRender() {
         <div class="acion-avatar" style="background:${urg==="critico"||urg==="vencido"?"var(--erro-bg)":urg==="urgente"?"var(--alerta-bg)":urg==="encerrado"?"var(--cinza-1)":"var(--verde-light)"};color:${urg==="critico"||urg==="vencido"?"var(--erro)":urg==="urgente"?"var(--alerta)":urg==="encerrado"?"var(--cinza-4)":"var(--verde)"};">${ap.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</div>
         <div class="acion-info">
           <div class="acion-nome">${ap.nome} <span style="font-weight:400;font-size:12px;color:var(--cinza-4);">${ap.crm}</span></div>
-          <div class="acion-sub">${ap.hospital} · ${ap.turno} · ${ap.diasSemana}</div>
+          <div class="acion-sub">${ap.hospital} · ${ap.turno} · ${ap.diasSemana}${ap.frequencia ? ' · ' + ap.frequencia : ''}</div>
           <div class="acion-tags">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">⏱ ${tagTxt}</span>
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">${ap.prazoDias}d · Vence ${ap.dataVencimento}</span>
