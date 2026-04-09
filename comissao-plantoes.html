@@ -1309,8 +1309,8 @@ function cardAcionamento(a) {
       <div class="dc"><div class="dl">Atestado</div><div class="dv">${a.statusAtestado || "N/A"}</div></div>
       ${a.exigeRep ? `
       <div class="dc"><div class="dl">Reposição</div><div class="dv">${a.statusRep}</div></div>
-      <div class="dc"><div class="dl">Data reposição</div><div class="dv">${a.dataRep
-        ? a.dataRep + (a.turnoRep ? " · " + a.turnoRep.split(" ")[0] : "")
+      <div class="dc"><div class="dl">Data reposição</div><div class="dv">${a.dataRep && a.dataRep !== "—"
+        ? '<strong style="color:var(--verde)">📅 ' + a.dataRep + (a.turnoRep ? ' · ' + a.turnoRep.split(" ")[0] : "") + '</strong>'
         : '<span style="color:var(--erro);font-weight:600;">Não agendada — cobrar plantonista</span>'
       }</div></div>
       ` : ""}
@@ -1364,7 +1364,7 @@ function abrirDetalhe(protocolo) {
         <div class="dl-item"><div class="dli-label">Status atestado</div><div class="dli-valor">${statusPill(a.statusAtestado || "N/A")}</div></div>
         ${a.exigeRep ? `
         <div class="dl-item"><div class="dli-label">Reposição</div><div class="dli-valor">${statusPill(a.statusRep)}</div></div>
-        <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep || "—"}</div></div>
+        <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep && a.dataRep !== "—" ? '<strong style="color:var(--verde)">📅 ' + a.dataRep + '</strong>' : '<span style="color:var(--erro);font-weight:600;">Não agendada — cobrar plantonista</span>'}</div></div>
         <div class="dl-item"><div class="dli-label">Turno reposição</div><div class="dli-valor">${a.turnoRep || "—"}</div></div>
         ` : ""}
       </div>
@@ -1542,7 +1542,7 @@ function vgRender() {
       <div class="dc"><div class="dl">Retorno previsto</div><div class="dv">${v.retorno||"—"}</div></div>` : "";
     const btnAcoes = v.status !== "Preenchida" ? `
       <button class="btn-acao btn-confirmar-atestado" onclick="vgRegistrarVoluntario('${v.id}')">✓ Voluntário assumiu</button>
-      ${v.status === "Aberta" ? `<button class="btn-acao" style="background:var(--info-bg);color:var(--info);" onclick="vgAcionarReserva('${v.id}')">⚡ Cobrir com reserva</button>` : ""}
+      
       <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>
     ` : `<span style="font-size:12px;color:var(--verde);font-weight:600;">✓ Preenchida por ${v.voluntario}</span>
       <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>`;
@@ -1570,13 +1570,15 @@ function vgRender() {
 function vgRegistrarVoluntario(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
-  const nome = prompt(`Nome do voluntário que assumiu:\n${v.hospital} — ${v.slot}`);
+  const nome = prompt(`Nome do voluntário que assumiu a vaga:\n${v.hospital} — ${v.slot}\n\n(A vaga sairá da lista de abertas e da Escala Semanal)`);
   if (!nome || !nome.trim()) return;
   v.voluntario = nome.trim();
   v.status = "Preenchida";
-  enviarAcao({ action:"preencherVaga", id, voluntario:nome.trim() });
-  atualizarBadge(); vgRender();
-  mostrarToast("✓ Vaga preenchida por " + nome.trim());
+  // Salva na planilha com nome do voluntário
+  enviarAcao({ action: "preencherVaga", id, voluntario: nome.trim() });
+  // Remove da escala semanal — esRender filtra status "Preenchida"
+  atualizarBadge(); vgRender(); esRender();
+  mostrarToast(`✓ Vaga assumida por ${nome.trim()} — removida da escala`);
 }
 
 function vgAcionarReserva(id) {
@@ -1592,11 +1594,11 @@ function vgAcionarReserva(id) {
 function vgDeletar(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
-  if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nEsta ação não pode ser desfeita.`)) return;
+  if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nA vaga sairá da Escala Semanal. Esta ação não pode ser desfeita.`)) return;
   vagasEstruturais = vagasEstruturais.filter(x => x.id !== id);
   enviarAcao({ action: "deletarVaga", id });
-  atualizarBadge(); vgRender();
-  mostrarToast("Vaga removida");
+  atualizarBadge(); vgRender(); esRender();
+  mostrarToast("Vaga removida da lista e da Escala Semanal");
 }
 
 let vgProxId = 1; // IDs manuais: VGM001, VGM002...
@@ -2184,35 +2186,49 @@ function lmRender() {
 function lmEncerrar(id) {
   const lm = licencasAtivas.find(x => x.id === id);
   if (!lm) return;
-  if (!confirm(`Confirmar encerramento da licença de ${lm.nome}?\n\nOs acionamentos de reserva referentes a esta licença serão cessados.`)) return;
-  lm.status = "Encerrada — retornou";
-  // Encerra TODAS as linhas deste mesmo nome+tipo na planilha
+  if (!confirm(`Confirmar encerramento da licença de ${lm.nome}?\n\nA plantonista retorna aos plantões e as vagas de cobertura serão removidas da Escala Semanal.`)) return;
   const nomeLm = lm.nome;
+  const tipoLm = lm.tipo;
+  // Marca todas as linhas do mesmo nome+tipo como encerradas na planilha
   licencasAtivas
-    .filter(l => l.nome === nomeLm && l.tipo === lm.tipo)
+    .filter(l => l.nome === nomeLm && l.tipo === tipoLm)
     .forEach(l => {
       l.status = "Encerrada — retornou";
-      enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: l.status });
+      enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: "Encerrada — retornou" });
     });
+  // Remove vagas estruturais desta cooperada (tipo LM/disciplinar/gestacional/saude)
+  vagasEstruturais = vagasEstruturais.filter(v => !(v.plantonista === nomeLm));
+  // esRender reconstruirá a escala sem esta cooperada (licencasAtivas já marcada como encerrada)
   atualizarBadge(); lmRender(); vgRender(); esRender();
-  mostrarToast(`✓ Licença de ${lm.nome} encerrada — acionamentos cessados`);
+  mostrarToast(`✓ ${nomeLm} retornou — licença encerrada e escala atualizada`);
 }
 
 function lmDefinirRetorno(id) {
   const lm = licencasAtivas.find(x => x.id === id);
   if (!lm) return;
-  const data = prompt(`Data de retorno de ${lm.nome} (formato DD/MM/AAAA):`);
+  const data = prompt(`Data de retorno de ${lm.nome} (formato DD/MM/AAAA):\n\nApós essa data, a plantonista retorna automaticamente aos plantões e suas vagas saem da escala.`);
   if (!data || !data.trim()) return;
+  const dataStr = data.trim();
   // Atualiza TODAS as linhas do mesmo nome+tipo
   licencasAtivas
     .filter(l => l.nome === lm.nome && l.tipo === lm.tipo)
     .forEach(l => {
-      l.retorno = data.trim();
-      enviarAcao({ action: "atualizarRetornoLicenca", id: l.id, retorno: l.retorno });
+      l.retorno = dataStr;
+      enviarAcao({ action: "atualizarRetornoLicenca", id: l.id, retorno: dataStr });
     });
-  lmRender();
-  esRender();
-  mostrarToast(`📅 Retorno de ${lm.nome} definido para ${data.trim()}`);
+  // Verifica se a data de retorno já passou — encerra automaticamente
+  const parts = dataStr.split("/");
+  if (parts.length === 3) {
+    const retDate = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
+    if (retDate <= new Date()) {
+      if (confirm(`A data ${dataStr} já passou. Deseja encerrar a licença de ${lm.nome} agora e liberar os plantões?`)) {
+        lmEncerrar(id);
+        return;
+      }
+    }
+  }
+  lmRender(); esRender();
+  mostrarToast(`📅 Retorno de ${lm.nome} definido para ${dataStr}`);
 }
 
 // Converte afastamento gestacional em LM no momento do parto
@@ -2231,30 +2247,51 @@ function lmConverterParaLM(id) {
   lm.status  = "Encerrada — convertida para LM";
   enviarAcao({ action: "encerrarLicenca", id, nome: lm.nome, status: lm.status });
 
-  // Remove das entradas de gestacional na escala semanal
-  for (let i = ES_ACIONAMENTOS_FIXOS.length - 1; i >= 0; i--) {
-    if (ES_ACIONAMENTOS_FIXOS[i].plantonista === lm.nome && ES_ACIONAMENTOS_FIXOS[i].tipo === "gestacional") {
-      ES_ACIONAMENTOS_FIXOS.splice(i, 1);
-    }
-  }
+  // Encerra TODAS as linhas gestacionais desta cooperada
+  licencasAtivas
+    .filter(l => l.nome === lm.nome && l.tipo === "gestacional")
+    .forEach(l => {
+      l.status = "Encerrada — convertida para LM";
+      enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: l.status });
+    });
 
-  // Cria nova LM
-  const novaLM = {
-    id:        "LM" + String(Date.now()).slice(-6),
-    nome:      lm.nome,
-    tipo:      "lm",
-    inicio:    inicioLM,
-    retorno:   retornoLM,
-    duracao:   120,
-    plantoes:  lm.plantoes || "",
-    obs:       `LM iniciada após gestacional. Parto em ${inicioLM}.`,
-    status:    "Ativa",
-  };
-  licencasAtivas.push(novaLM);
-  enviarAcao({ action: "registrarLicenca", licenca: novaLM });
+  // Coleta os dias das licenças gestacionais para criar as novas linhas de LM
+  const diasGest = [];
+  const hospitaisGest = [];
+  licencasAtivas
+    .filter(l => l.nome === lm.nome && l.tipo === "gestacional")
+    .forEach(l => {
+      if (Array.isArray(l.dias)) l.dias.forEach(d => { if (!diasGest.includes(d)) diasGest.push(d); });
+      if (l.hospital && !hospitaisGest.includes(l.hospital)) hospitaisGest.push(l.hospital);
+    });
 
-  // Popula escala semanal com todos os turnos (D e N) dos dias dos plantões
-  lmPopularEscala(novaLM);
+  // Cria novas linhas de LM — uma por hospital/slot das gestacionais (agora cobre D e N)
+  const linhasGest = licencasAtivas.filter(l => l.nome === lm.nome && l.tipo === "gestacional");
+  const novasLMs = (linhasGest.length > 0 ? linhasGest : [lm]).map(g => ({
+    id:       "LM" + String(Date.now() + Math.random() * 1000 | 0).slice(-6),
+    nome:     lm.nome,
+    tipo:     "lm",
+    inicio:   inicioLM,
+    retorno:  retornoLM,
+    duracao:  120,
+    hospital: g.hospital || lm.hospital || "—",
+    slot:     (g.slot || lm.slot || "").replace("noturno","diurno/noturno"),
+    dias:     g.dias || lm.dias || [],
+    turno:    "Diurno (07h–19h)", // LM cobre todos os turnos
+    obs:      `LM iniciada após gestacional. Parto em ${inicioLM}.`,
+    status:   "Ativa",
+  }));
+
+  novasLMs.forEach(novaLM => {
+    licencasAtivas.push(novaLM);
+    enviarAcao({ action: "registrarLicenca", licenca: novaLM });
+  });
+  // Adiciona também versão noturna
+  novasLMs.forEach(novaLM => {
+    const novaLMN = { ...novaLM, id: "LM" + String(Date.now() + Math.random() * 1000 | 0).slice(-6), turno: "Noturno (19h–07h)" };
+    licencasAtivas.push(novaLMN);
+    enviarAcao({ action: "registrarLicenca", licenca: novaLMN });
+  });
 
   atualizarBadge(); lmRender(); esRender();
   mostrarToast(`🍼 LM de ${lm.nome} iniciada — retorno previsto em ${retornoLM}`);
@@ -2398,46 +2435,7 @@ function lmPopularEscala(lm) {
 }
 
 // Converte gestacional → LM no momento do parto
-function lmConverterParaLM(id) {
-  // id pode ser o id de qualquer linha do grupo — busca todas as gestacionais do mesmo nome
-  const lmRef = licencasAtivas.find(x => x.id === id);
-  if (!lmRef) return;
-  const lm = lmRef; // usa como referência
-  if (!confirm(`Confirmar início da LM de ${lm.nome}?\n\nAfastamento gestacional encerrado. LM de 120 dias começa hoje.`)) return;
 
-  const hoje = new Date();
-  const p = n => String(n).padStart(2, "0");
-  const inicioLM  = `${p(hoje.getDate())}/${p(hoje.getMonth()+1)}/${hoje.getFullYear()}`;
-  const fimLMDate = new Date(hoje.getTime() + 120 * 86400000);
-  const retornoLM = `${p(fimLMDate.getDate())}/${p(fimLMDate.getMonth()+1)}/${fimLMDate.getFullYear()}`;
-
-  // Encerra gestacional
-  lm.status = "Encerrada — convertida para LM";
-  enviarAcao({ action: "encerrarLicenca", id, nome: lm.nome, status: lm.status });
-
-  // Remove entradas gestacionais da escala
-  for (let i = ES_ACIONAMENTOS_FIXOS.length - 1; i >= 0; i--) {
-    if (ES_ACIONAMENTOS_FIXOS[i].plantonista === lm.nome && ES_ACIONAMENTOS_FIXOS[i].tipo === "gestacional") {
-      ES_ACIONAMENTOS_FIXOS.splice(i, 1);
-    }
-  }
-
-  // Nova LM
-  const novaLM = {
-    id:       "LM" + String(Date.now()).slice(-6),
-    nome:     lm.nome, tipo: "lm",
-    inicio:   inicioLM, retorno: retornoLM, duracao: 120,
-    plantoes: lm.plantoes || "",
-    obs:      `LM iniciada após gestacional. Parto em ${inicioLM}.`,
-    status:   "Ativa",
-  };
-  licencasAtivas.push(novaLM);
-  enviarAcao({ action: "registrarLicenca", licenca: novaLM });
-  lmPopularEscala(novaLM);
-
-  atualizarBadge(); lmRender(); esRender();
-  mostrarToast(`🍼 LM de ${lm.nome} iniciada — retorno previsto em ${retornoLM}`);
-}
 
 // Ao carregar: busca licenças salvas no Apps Script.
 // As licenças pré-carregadas (LM001–LM007) já estão no ES_ACIONAMENTOS_FIXOS hardcoded —
