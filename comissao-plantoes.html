@@ -436,7 +436,7 @@ table { min-width: 600px; }
       Histórico
     </div>
     <div class="tab" id="tab-lms" onclick="mudarTab('lms')">
-      Licenças / LM
+      Licenças / Afastamentos
       <span class="badge-tab" id="badge-lms">0</span>
     </div>
     <div class="tab" id="tab-avisos" onclick="mudarTab('avisos')">
@@ -692,25 +692,25 @@ table { min-width: 600px; }
 <div id="tela-vagas" class="tela wrapper">
 
   <div style="background:var(--info-bg);border-left:3px solid var(--info);border-radius:0 var(--r) var(--r) 0;padding:11px 16px;margin-bottom:16px;font-size:13px;color:#1d3a6b;">
-    <strong>Vagas estruturais da escala</strong> — plantões marcados como VAGO que precisam de voluntário. Quando um cooperado assumir, registre abaixo. Se não houver voluntário, acione o reserva.
+    <strong>Vagas estruturais da escala</strong> — plantões descobertos por LM, afastamento ou saída. Todas são cobertas pelo reserva. Se um voluntário assumir, registre abaixo para histórico.
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
     <div class="stat-card urgente" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;">
       <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--erro);" id="vg-st-aberta">0</div>
-      <div style="font-size:12px;color:var(--cinza-4);">Vagas abertas</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Para cobrir com reserva</div>
     </div>
-    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--info);">
-      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--info);" id="vg-st-reserva">0</div>
-      <div style="font-size:12px;color:var(--cinza-4);">Cobertas por reserva</div>
-    </div>
-    <div class="stat-card normal" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;">
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--verde);">
       <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--verde);" id="vg-st-voluntario">0</div>
-      <div style="font-size:12px;color:var(--cinza-4);">Preenchidas por voluntário</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Assumidas por voluntário</div>
     </div>
     <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--amarelo);">
       <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--amarelo);" id="vg-st-lm">0</div>
-      <div style="font-size:12px;color:var(--cinza-4);">Descobertas por LM/Afast.</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Por LM / Afastamento</div>
+    </div>
+    <div class="stat-card" style="background:white;border-radius:var(--r-lg);box-shadow:var(--sombra);padding:14px 16px;border-top:2px solid var(--info);">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--info);" id="vg-st-total">0</div>
+      <div style="font-size:12px;color:var(--cinza-4);">Total de vagas</div>
     </div>
   </div>
 
@@ -1445,7 +1445,7 @@ function abrirDetalhe(protocolo) {
       <h4>Documentação</h4>
       <div class="detalhe-grid">
         <div class="dl-item"><div class="dli-label">Status atestado</div><div class="dli-valor">${statusPill(a.statusAtestado || "N/A")}</div></div>
-        ${a.linkAtestado ? `
+        ${a.linkAtestado && String(a.linkAtestado).startsWith("https://drive.google.com") ? `
         <div class="dl-item">
           <div class="dli-label">Arquivo do atestado</div>
           <div class="dli-valor">
@@ -1457,8 +1457,12 @@ function abrirDetalhe(protocolo) {
         </div>` : a.statusAtestado && a.statusAtestado.includes("Recebido") ? `
         <div class="dl-item">
           <div class="dli-label">Arquivo do atestado</div>
-          <div class="dvi-valor" style="font-size:12px;color:var(--cinza-4);">
-            Recebido via e-mail — link não disponível nesta versão
+          <div class="dli-valor" style="font-size:12px;color:var(--cinza-4);">
+            Recebido via e-mail — verifique a pasta
+            <a href="https://drive.google.com/drive/folders/1uoKXRejhkXFwKhMGVX5LHOZXsYO2GUmK"
+               target="_blank" style="color:var(--verde);font-weight:600;margin-left:4px;">
+              📁 Abrir pasta de atestados
+            </a>
           </div>
         </div>` : ""}
         ${a.exigeRep ? `
@@ -1603,10 +1607,10 @@ function vgSetFiltro(f, el) {
 }
 
 function vgRender() {
-  document.getElementById("vg-st-aberta").textContent     = vagasEstruturais.filter(v => v.status === "Aberta").length;
-  document.getElementById("vg-st-reserva").textContent    = vagasEstruturais.filter(v => v.status === "Reserva").length;
+  document.getElementById("vg-st-aberta").textContent     = vagasEstruturais.filter(v => v.status !== "Deletada" && v.status !== "Preenchida").length;
   document.getElementById("vg-st-voluntario").textContent = vagasEstruturais.filter(v => v.status === "Preenchida").length;
-  document.getElementById("vg-st-lm").textContent         = vagasEstruturais.filter(v => v.tipo === "lm" || v.tipo === "disciplinar").length;
+  document.getElementById("vg-st-lm").textContent         = vagasEstruturais.filter(v => v.tipo === "lm" || v.tipo === "disciplinar" || v.tipo === "saude" || v.tipo === "gestacional").length;
+  document.getElementById("vg-st-total").textContent      = vagasEstruturais.filter(v => v.status !== "Deletada").length;
 
   let itens = [...vagasEstruturais];
   if (vgFiltro === "aberta")      itens = itens.filter(v => v.status === "Aberta");
@@ -2621,11 +2625,32 @@ async function lmCarregarLicencas() {
     const json = await resp.json();
     if (!json.ok) throw new Error("Resposta inválida");
 
-    // Reconstrói completamente a partir do Sheets
-    licencasAtivas = json.dados || [];
+    // Normaliza datas que podem vir como Date.toString() do Sheets
+    function normData(val) {
+      if (!val) return "—";
+      const s = String(val).trim();
+      if (s === "—" || s === "Em aberto" || s === "Afastada") return s;
+      // Já está em DD/MM/AAAA
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+      // ISO AAAA-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        const p = s.split("T")[0].split("-");
+        return p[2] + "/" + p[1] + "/" + p[0];
+      }
+      // Date.toString() do GS: "Wed Jun 03 2026 00:00:00 GMT-0300..."
+      const meses = {Jan:"01",Feb:"02",Mar:"03",Apr:"04",May:"05",Jun:"06",
+                     Jul:"07",Aug:"08",Sep:"09",Oct:"10",Nov:"11",Dec:"12"};
+      const m = s.match(/\w{3}\s+(\w{3})\s+(\d{2})\s+(\d{4})/);
+      if (m) return m[2] + "/" + (meses[m[1]] || "00") + "/" + m[3];
+      return s;
+    }
 
-    // Reconstrói ES_ACIONAMENTOS_FIXOS a partir das licenças ativas
-    // Limpa e repopula — única fonte de verdade
+    licencasAtivas = (json.dados || []).map(lm => ({
+      ...lm,
+      inicio:  normData(lm.inicio),
+      retorno: normData(lm.retorno),
+    }));
+
     ES_ACIONAMENTOS_FIXOS.length = 0;
     licencasAtivas
       .filter(l => l.status === "Ativa")
