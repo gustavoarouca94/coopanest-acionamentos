@@ -1454,16 +1454,6 @@ function abrirDetalhe(protocolo) {
               📄 Abrir atestado no Drive
             </a>
           </div>
-        </div>` : a.statusAtestado && a.statusAtestado.includes("Recebido") ? `
-        <div class="dl-item">
-          <div class="dli-label">Arquivo do atestado</div>
-          <div class="dli-valor" style="font-size:12px;color:var(--cinza-4);">
-            Recebido via e-mail — verifique a pasta
-            <a href="https://drive.google.com/drive/folders/1uoKXRejhkXFwKhMGVX5LHOZXsYO2GUmK"
-               target="_blank" style="color:var(--verde);font-weight:600;margin-left:4px;">
-              📁 Abrir pasta de atestados
-            </a>
-          </div>
         </div>` : ""}
         ${a.exigeRep ? `
         <div class="dl-item"><div class="dli-label">Reposição</div><div class="dli-valor">${statusPill(a.statusRep)}</div></div>
