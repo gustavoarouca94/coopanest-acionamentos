@@ -476,7 +476,7 @@ table { min-width: 600px; }
 
   <div class="filtros-bar">
     <button class="filtro-btn ativo" onclick="setFiltro('todos', this)">Todos</button>
-    <button class="filtro-btn" onclick="setFiltro('atestado', this)">Atestado</button>
+    <button class="filtro-btn" onclick="setFiltro('atestado', this)">Doc. pendente</button>
     <button class="filtro-btn" onclick="setFiltro('reposicao', this)">Reposição</button>
     <button class="filtro-btn" onclick="setFiltro('disciplinar', this)">Disciplinar</button>
     <button class="filtro-btn" onclick="setFiltro('vencido', this)">Vencido</button>
@@ -506,7 +506,7 @@ table { min-width: 600px; }
             <th>Plantonista</th>
             <th>Data plantão</th>
             <th>Motivo</th>
-            <th>Atestado</th>
+            <th>Documento</th>
             <th>Reposição</th>
             <th>Ações</th>
           </tr>
@@ -1155,7 +1155,8 @@ async function carregarDados() {
           dataRep,
           turnoRep,
           statusRep,
-          statusAtestado: a.statusAtestado || a.status_atestado || "Pendente",
+          // statusAtestado: usa o valor do GS; fallback "N/A" (não "Pendente") para não gerar falso alarme
+          statusAtestado: a.statusAtestado || a.status_atestado || "N/A",
           prazo48h:       a.prazo48h  || a.prazo_48h  || "",
           nome:           a.nome      || a.plantonista || "",
           motivo:         a.motivo    || "",
@@ -1370,7 +1371,7 @@ function cardAcionamento(a) {
 
   // Botões de ação
   const botoesAtestado = a.statusAtestado === "Pendente" || a.statusAtestado === "Vencido — escalado"
-    ? `<button class="btn-acao btn-confirmar-atestado" onclick="confirmarAtestado('${a.protocolo}')">✓ Confirmar atestado recebido</button>`
+    ? `<button class="btn-acao btn-confirmar-atestado" onclick="confirmarAtestado('${a.protocolo}')">✓ Confirmar documento recebido</button>`
     : "";
   const botoesRep = a.exigeRep && a.statusRep === "Pendente"
     ? `<button class="btn-acao btn-rep-cumprida" onclick="confirmarReposicao('${a.protocolo}')">✓ Marcar reposição cumprida</button>`
@@ -1418,7 +1419,7 @@ function abrirDetalhe(protocolo) {
 
   const botoesModal = [];
   if (a.statusAtestado === "Pendente" || a.statusAtestado === "Vencido — escalado") {
-    botoesModal.push(`<button class="btn-modal-acao btn-ma-atestado" onclick="confirmarAtestado('${a.protocolo}');fecharModal()">✓ Confirmar atestado recebido</button>`);
+    botoesModal.push(`<button class="btn-modal-acao btn-ma-atestado" onclick="confirmarAtestado('${a.protocolo}');fecharModal()">✓ Confirmar documento recebido</button>`);
   }
   if (a.exigeRep && a.statusRep === "Pendente") {
     botoesModal.push(`<button class="btn-modal-acao btn-ma-rep" onclick="confirmarReposicao('${a.protocolo}');fecharModal()">✓ Marcar reposição cumprida</button>`);
@@ -2829,6 +2830,7 @@ function statusPill(s) {
     "Vencido — escalado":   "background:var(--erro-bg);color:var(--erro)",
     "Cumprida":             "background:var(--verde-light);color:var(--verde)",
     "N/A":                  "background:var(--cinza-1);color:var(--cinza-4)",
+    "Não aplicável":        "background:var(--cinza-1);color:var(--cinza-4)",
     "Verificar":            "background:var(--amarelo-bg);color:var(--amarelo)",
   };
   const style = map[s] || "background:var(--cinza-1);color:var(--cinza-4)";
