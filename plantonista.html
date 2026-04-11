@@ -670,10 +670,10 @@ table { min-width: 600px; }
         </div>
       </div>
 
-      <!-- Upload atestado -->
-      <div class="campo-grupo">
-        <label>Atestado médico</label>
-        <div class="hint">Opcional neste momento — você tem 24h para enviar caso não tenha em mãos</div>
+      <!-- Upload de documento — aparece para todos os motivos -->
+      <div class="campo-grupo" id="bloco-upload-doc">
+        <label id="a-upload-label">Documento comprobatório</label>
+        <div class="hint" id="a-upload-hint">Opcional — anexe qualquer documento relevante ao acionamento</div>
         <div class="upload-zone" id="a-upload-zone"
           onclick="document.getElementById('a-foto').click()"
           ondragover="onDragOver(event,'a-upload-zone')"
@@ -1162,18 +1162,40 @@ function mostrarComprovante({ titulo, subtitulo, protocolo, linhas, alertas }) {
 // ════ MÓDULO A: ACIONAR RESERVA ════
 function onMotivoChange() {
   const m = val("a-motivo");
-  const isAM  = m === "Doença/Atestado Médico" || m.includes("Internamento") || m.includes("Cirurgia") || m.includes("Afastamento temporário");
-  const isLM  = m === "Licença-maternidade";
-  const isGest= m.includes("gestacional");
+  const isAM   = m === "Doença/Atestado Médico" || m.includes("Internamento") || m.includes("Cirurgia") || m.includes("Afastamento temporário");
+  const isLM   = m === "Licença-maternidade";
+  const isGest = m.includes("gestacional");
+  const isDisc = m === "Afastamento disciplinar";
 
   campo("bloco-atestado-ac").classList.toggle("vis", isAM);
   campo("bloco-lm").classList.toggle("vis", isLM);
   campo("bloco-gestacional").classList.toggle("vis", isGest);
 
-  // Reseta sub-blocos
   if (!isAM) {
     campo("bloco-reposicao").classList.remove("vis");
     campo("a-duracao-atestado").value = "";
+  }
+
+  // Ajusta label e hint do campo de upload conforme o motivo
+  const labelEl = document.getElementById("a-upload-label");
+  const hintEl  = document.getElementById("a-upload-hint");
+  if (!labelEl || !hintEl) return;
+
+  if (isAM) {
+    labelEl.textContent = "Atestado médico";
+    hintEl.textContent  = "Opcional neste momento — você tem 24h para enviar caso não tenha em mãos";
+  } else if (isDisc) {
+    labelEl.textContent = "Documento do afastamento disciplinar";
+    hintEl.textContent  = "Anexe o comunicado ou termo de afastamento";
+  } else if (isLM || isGest) {
+    labelEl.textContent = "Documento comprobatório";
+    hintEl.textContent  = "Anexe o atestado de parto, DUM ou documentação médica";
+  } else if (m) {
+    labelEl.textContent = "Documento comprobatório";
+    hintEl.textContent  = "Opcional — anexe qualquer documento relevante ao acionamento";
+  } else {
+    labelEl.textContent = "Documento comprobatório";
+    hintEl.textContent  = "Opcional — anexe qualquer documento relevante ao acionamento";
   }
 }
 
