@@ -2352,51 +2352,93 @@ function lmRender() {
   }).join("");
 }
 
-function lmEncerrar(id) {
+async function lmEncerrar(id) {
   const lm = licencasAtivas.find(x => x.id === id);
   if (!lm) return;
   if (!confirm(`Confirmar encerramento da licença de ${lm.nome}?\n\nA plantonista retorna aos plantões e as vagas de cobertura serão removidas da Escala Semanal.`)) return;
+
   const nomeLm = lm.nome;
   const tipoLm = lm.tipo;
-  // Marca todas as linhas do mesmo nome+tipo como encerradas na planilha
+
+  // 1. Atualiza em memória IMEDIATAMENTE para o card desaparecer da tela
   licencasAtivas
     .filter(l => l.nome === nomeLm && l.tipo === tipoLm)
-    .forEach(l => {
-      l.status = "Encerrada — retornou";
-      enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: "Encerrada — retornou" });
-    });
-  // Remove vagas estruturais desta cooperada (tipo LM/disciplinar/gestacional/saude)
-  vagasEstruturais = vagasEstruturais.filter(v => !(v.plantonista === nomeLm));
-  // esRender reconstruirá a escala sem esta cooperada (licencasAtivas já marcada como encerrada)
+    .forEach(l => { l.status = "Encerrada — retornou"; });
+
+  // 2. Remove vagas estruturais desta cooperada da memória
+  vagasEstruturais = vagasEstruturais.filter(v => v.plantonista !== nomeLm);
+
+  // 3. Re-renderiza imediatamente — a licença some da tela
   atualizarBadge(); lmRender(); vgRender(); esRender();
-  mostrarToast(`✓ ${nomeLm} retornou — licença encerrada e escala atualizada`);
+  mostrarToast(`✓ ${nomeLm} retornou — atualizando planilha…`);
+
+  // 4. Persiste no GS — envia UMA chamada com o nome para encerrar todas as linhas
+  try {
+    const resultado = await enviarAcao({
+      action: "encerrarLicenca",
+      id:     lm.id,
+      nome:   nomeLm,
+      status: "Encerrada — retornou"
+    });
+    if (resultado && resultado.ok) {
+      mostrarToast(`✓ ${nomeLm} encerrada — ${resultado.encerradas || 1} linha(s) atualizadas na planilha`);
+    } else {
+      console.warn("encerrarLicenca GS retornou erro:", resultado);
+      mostrarToast(`⚠️ Encerrado localmente — verifique a planilha para ${nomeLm}`);
+    }
+  } catch(e) {
+    console.warn("Erro ao encerrar licença no GS:", e);
+    mostrarToast(`⚠️ Encerrado localmente — verifique a planilha para ${nomeLm}`);
+  }
+
+  // 5. Recarrega do Sheets após 3s — dá tempo ao GS de gravar
+  // Mantém os encerrados locais durante o re-fetch para evitar flash
+  const nomesEncerrados = new Set(
+    licencasAtivas.filter(l => l.status === "Encerrada — retornou").map(l => l.nome)
+  );
+  setTimeout(async () => {
+    await lmCarregarLicencas();
+    // Garante que nomes recém-encerrados permanecem encerrados mesmo se GS ainda não confirmou
+    licencasAtivas.forEach(l => {
+      if (nomesEncerrados.has(l.nome)) l.status = "Encerrada — retornou";
+    });
+    await vgCarregarVagas();
+    atualizarBadge(); lmRender(); esRender();
+    mostrarToast(`✓ ${nomeLm} encerrada — planilha atualizada`);
+  }, 3000);
 }
 
-function lmDefinirRetorno(id) {
+async function lmDefinirRetorno(id) {
   const lm = licencasAtivas.find(x => x.id === id);
   if (!lm) return;
   const data = prompt(`Data de retorno de ${lm.nome} (formato DD/MM/AAAA):\n\nApós essa data, a plantonista retorna automaticamente aos plantões e suas vagas saem da escala.`);
   if (!data || !data.trim()) return;
   const dataStr = data.trim();
-  // Atualiza TODAS as linhas do mesmo nome+tipo
+
+  // Atualiza em memória
   licencasAtivas
     .filter(l => l.nome === lm.nome && l.tipo === lm.tipo)
-    .forEach(l => {
-      l.retorno = dataStr;
-      enviarAcao({ action: "atualizarRetornoLicenca", id: l.id, retorno: dataStr });
-    });
-  // Verifica se a data de retorno já passou — encerra automaticamente
+    .forEach(l => { l.retorno = dataStr; });
+
+  // Se data já passou, oferece encerrar agora
   const parts = dataStr.split("/");
   if (parts.length === 3) {
     const retDate = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
     if (retDate <= new Date()) {
       if (confirm(`A data ${dataStr} já passou. Deseja encerrar a licença de ${lm.nome} agora e liberar os plantões?`)) {
-        lmEncerrar(id);
+        await lmEncerrar(id);
         return;
       }
     }
   }
-  lmRender(); esRender();
+
+  // Persiste no GS — todas as linhas do mesmo nome+tipo
+  const linhas = licencasAtivas.filter(l => l.nome === lm.nome && l.tipo === lm.tipo);
+  for (const l of linhas) {
+    await enviarAcao({ action: "atualizarRetornoLicenca", id: l.id, retorno: dataStr });
+  }
+
+  atualizarBadge(); lmRender(); esRender();
   mostrarToast(`📅 Retorno de ${lm.nome} definido para ${dataStr}`);
 }
 
@@ -2636,10 +2678,22 @@ async function lmCarregarLicencas() {
       return s;
     }
 
+    // Preserva status "Encerrada" de licenças recém-encerradas localmente
+    // Evita que re-fetch sobrescreva encerramento antes do GS confirmar
+    const encerradasLocais = new Set(
+      licencasAtivas
+        .filter(l => l.status && l.status.startsWith("Encerrada"))
+        .map(l => l.nome + "|" + l.tipo)
+    );
+
     licencasAtivas = (json.dados || []).map(lm => ({
       ...lm,
       inicio:  normData(lm.inicio),
       retorno: normData(lm.retorno),
+      // Mantém encerramento local se o GS ainda não confirmou
+      status: encerradasLocais.has(lm.nome + "|" + lm.tipo)
+        ? "Encerrada — retornou"
+        : lm.status,
     }));
 
     ES_ACIONAMENTOS_FIXOS.length = 0;
