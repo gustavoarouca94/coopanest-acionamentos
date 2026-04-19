@@ -1483,51 +1483,60 @@ async function confirmarAtestado(protocolo) {
   const a = acionamentos.find(x => x.protocolo === protocolo);
   if (!a) return;
   a.statusAtestado = "Recebido";
-  a.prazo48h       = "";
-  await enviarAcao({ action: "confirmarAtestado", protocolo });
+  a.prazo48h = "";
   renderTudo();
-  mostrarToast("✓ Atestado confirmado para " + a.nome);
+  mostrarToast("✓ Confirmando atestado de " + a.nome + "…");
+
+  const r = await enviarAcao({ action: "confirmarAtestado", protocolo });
+  if (r && r.ok) {
+    mostrarToast("✓ Atestado confirmado para " + a.nome);
+  } else {
+    mostrarToast("⚠️ Erro ao confirmar — verifique a planilha para " + a.nome);
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
 async function confirmarReposicao(protocolo) {
   const a = acionamentos.find(x => x.protocolo === protocolo);
   if (!a) return;
   a.statusRep = "Cumprida";
-  await enviarAcao({ action: "confirmarReposicao", protocolo });
   renderTudo();
-  mostrarToast("✓ Reposição marcada como cumprida para " + a.nome);
+  mostrarToast("✓ Marcando reposição de " + a.nome + "…");
+
+  const r = await enviarAcao({ action: "confirmarReposicao", protocolo });
+  if (r && r.ok) {
+    mostrarToast("✓ Reposição cumprida — " + a.nome);
+  } else {
+    mostrarToast("⚠️ Erro ao marcar — verifique a planilha para " + a.nome);
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
-// Envia ações ao Apps Script.
-// Para operações de vaga usa GET (permite ler resposta e confirmar sucesso).
-// Para demais ações usa POST no-cors (Apps Script bloqueia JSON cross-origin no POST).
+// Envia ações ao Apps Script via GET — todas as ações retornam resposta JSON legível.
+// Isso garante que o HTML saiba se o GS executou com sucesso antes de atualizar a tela.
 async function enviarAcao(payload) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("COLE_AQUI")) return null;
-
-  const acoesPorGet = ["criarVaga","deletarVaga","atualizarStatusVaga","preencherVaga","vagaReserva",
-                       "registrarLicenca","encerrarLicenca","atualizarRetornoLicenca"];
-
-  if (acoesPorGet.includes(payload.action)) {
-    // Serializa o payload como parâmetro GET — o GS lê via e.parameter.payload
-    try {
-      const url = APPS_SCRIPT_URL + "?payload=" + encodeURIComponent(JSON.stringify(payload));
-      const resp = await fetch(url);
-      const json = await resp.json();
-      if (!json.ok) console.warn("Ação falhou:", json.erro || json);
-      return json;
-    } catch(e) { console.warn("Erro na ação GET:", payload.action, e); return null; }
-  }
-
-  // Demais ações (atestado, turno, aviso prévio) via POST no-cors
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      mode:   "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-    });
-  } catch(e) { console.warn("Erro na ação POST:", payload.action, e); }
-  return null;
+    const url = APPS_SCRIPT_URL + "?payload=" + encodeURIComponent(JSON.stringify(payload));
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (!json.ok) console.warn("Ação falhou:", payload.action, json.erro || json);
+    return json;
+  } catch(e) {
+    console.warn("Erro na ação:", payload.action, e);
+    return null;
+  }
+}
+
+// Recarrega TUDO do Sheets — usado após qualquer ação de estado
+async function recarregarTudo() {
+  await Promise.all([
+    carregarDados(),
+    carregarAvisosPrevios(),
+    vgCarregarVagas(),
+    lmCarregarLicencas(),
+  ]);
+  esRender();
 }
 
 // ── Filtros
@@ -1661,38 +1670,54 @@ function vgRender() {
   }).join("");
 }
 
-function vgRegistrarVoluntario(id) {
+async function vgRegistrarVoluntario(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
   const nome = prompt(`Nome do voluntário que assumiu a vaga:\n${v.hospital} — ${v.slot}\n\n(A vaga sairá da lista de abertas e da Escala Semanal)`);
   if (!nome || !nome.trim()) return;
+
   v.voluntario = nome.trim();
   v.status = "Preenchida";
-  // Salva na planilha com nome do voluntário
-  enviarAcao({ action: "preencherVaga", id, voluntario: nome.trim() });
-  // Remove da escala semanal — esRender filtra status "Preenchida"
   atualizarBadge(); vgRender(); esRender();
-  mostrarToast(`✓ Vaga assumida por ${nome.trim()} — removida da escala`);
+  mostrarToast(`Registrando ${nome.trim()} na vaga…`);
+
+  const r = await enviarAcao({ action: "preencherVaga", id, voluntario: nome.trim() });
+  if (r && r.ok) {
+    mostrarToast(`✓ Vaga assumida por ${nome.trim()} — removida da escala`);
+  } else {
+    mostrarToast(`⚠️ Erro ao registrar — verifique a planilha`);
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
-function vgAcionarReserva(id) {
+async function vgAcionarReserva(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
   if (!confirm(`Confirmar cobertura por reserva:\n${v.hospital} — ${v.slot}?`)) return;
   v.status = "Reserva";
-  enviarAcao({ action:"vagaReserva", id });
   atualizarBadge(); vgRender();
-  mostrarToast("⚡ Vaga marcada para cobertura por reserva");
+  mostrarToast("⚡ Marcando cobertura por reserva…");
+
+  const r = await enviarAcao({ action:"vagaReserva", id });
+  if (r && r.ok) mostrarToast("⚡ Vaga marcada para cobertura por reserva");
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
-function vgDeletar(id) {
+async function vgDeletar(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
   if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nA vaga sairá da Escala Semanal. Esta ação não pode ser desfeita.`)) return;
   vagasEstruturais = vagasEstruturais.filter(x => x.id !== id);
-  enviarAcao({ action: "deletarVaga", id });
   atualizarBadge(); vgRender(); esRender();
-  mostrarToast("Vaga removida da lista e da Escala Semanal");
+  mostrarToast("Removendo vaga…");
+
+  const r = await enviarAcao({ action: "deletarVaga", id });
+  if (r && r.ok) {
+    mostrarToast("✓ Vaga removida da lista e da Escala Semanal");
+  } else {
+    mostrarToast("⚠️ Erro ao remover — verifique a planilha");
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
 let vgProxId = 1; // IDs manuais: VGM001, VGM002...
@@ -2236,16 +2261,21 @@ function lmDiasRestantes(lm) {
   if (!lm.retorno || lm.retorno === "Em aberto" || lm.retorno === "Afastada" || lm.retorno === "—") return null;
   const parts = lm.retorno.split("/");
   if (parts.length < 3) return null;
-  const ret = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-  return Math.ceil((ret - new Date()) / 86400000);
+  // Usa meio-dia para evitar problemas de fuso horário
+  const ret = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]), 12, 0, 0);
+  const hoje = new Date();
+  hoje.setHours(12, 0, 0, 0);
+  return Math.round((ret - hoje) / 86400000);
 }
 
 function lmProgresso(lm) {
   if (!lm.duracao || !lm.inicio || lm.inicio === "—") return null;
   const parts = lm.inicio.split("/");
   if (parts.length < 3) return null;
-  const ini = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-  const decorrido = Math.ceil((new Date() - ini) / 86400000);
+  const ini = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]), 12, 0, 0);
+  const hoje = new Date();
+  hoje.setHours(12, 0, 0, 0);
+  const decorrido = Math.round((hoje - ini) / 86400000);
   return Math.min(100, Math.max(0, Math.round(decorrido / lm.duracao * 100)));
 }
 
@@ -2299,9 +2329,11 @@ function lmRender() {
     let urgBorda = "var(--cinza-2)";
     let retornoTag = "";
     if (diasR !== null) {
-      if (diasR <= 0)  { urgBorda = "var(--verde)"; retornoTag = `<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--verde-light);color:var(--verde);">✓ Retorno hoje ou passado</span>`; }
+      if (diasR < 0)  { urgBorda = "var(--erro)"; retornoTag = `<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--erro-bg);color:var(--erro);">⚠ VENCIDA há ${Math.abs(diasR)}d — encerrar</span>`; }
+      else if (diasR === 0) { urgBorda = "var(--verde)"; retornoTag = `<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--verde-light);color:var(--verde);">✓ Retorna hoje</span>`; }
       else if (diasR <= 7)  { urgBorda = "var(--alerta)"; retornoTag = `<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--alerta-bg);color:var(--alerta);">Retorna em ${diasR}d</span>`; }
       else if (diasR <= 15) { urgBorda = "var(--amarelo)"; retornoTag = `<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:var(--amarelo-bg);color:var(--amarelo);">Retorna em ${diasR}d</span>`; }
+      else { retornoTag = `<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">Retorna em ${diasR}d</span>`; }
     } else if (lm.retorno === "Em aberto" || lm.retorno === "Afastada") {
       urgBorda = "var(--cinza-3)";
       retornoTag = `<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">Data de retorno em aberto</span>`;
@@ -2365,23 +2397,37 @@ async function lmEncerrar(id) {
     .filter(l => l.nome === nomeLm && l.tipo === tipoLm)
     .forEach(l => { l.status = "Encerrada — retornou"; });
 
-  // 2. Remove vagas estruturais desta cooperada da memória
-  vagasEstruturais = vagasEstruturais.filter(v => v.plantonista !== nomeLm);
+  // 2. Identifica vagas estruturais desta cooperada (nome dela em qualquer campo)
+  const vagasDaCooperada = vagasEstruturais.filter(v =>
+    v.plantonista === nomeLm || v.voluntario === nomeLm
+  );
 
-  // 3. Re-renderiza imediatamente — a licença some da tela
+  // 3. Remove vagas estruturais desta cooperada da memória
+  vagasEstruturais = vagasEstruturais.filter(v =>
+    v.plantonista !== nomeLm && v.voluntario !== nomeLm
+  );
+
+  // 4. Re-renderiza imediatamente — a licença e as vagas somem da tela
   atualizarBadge(); lmRender(); vgRender(); esRender();
   mostrarToast(`✓ ${nomeLm} retornou — atualizando planilha…`);
 
-  // 4. Persiste no GS — envia UMA chamada com o nome para encerrar todas as linhas
+  // 5. Persiste no GS — encerra licença (todas as linhas) + deleta vagas estruturais
   try {
+    // Encerra todas as linhas da licença
     const resultado = await enviarAcao({
       action: "encerrarLicenca",
       id:     lm.id,
       nome:   nomeLm,
       status: "Encerrada — retornou"
     });
+
+    // Deleta cada vaga estrutural da cooperada na planilha
+    for (const v of vagasDaCooperada) {
+      await enviarAcao({ action: "deletarVaga", id: v.id });
+    }
+
     if (resultado && resultado.ok) {
-      mostrarToast(`✓ ${nomeLm} encerrada — ${resultado.encerradas || 1} linha(s) atualizadas na planilha`);
+      mostrarToast(`✓ ${nomeLm} encerrada — ${resultado.encerradas || 1} licença(s) e ${vagasDaCooperada.length} vaga(s) atualizadas`);
     } else {
       console.warn("encerrarLicenca GS retornou erro:", resultado);
       mostrarToast(`⚠️ Encerrado localmente — verifique a planilha para ${nomeLm}`);
@@ -2391,21 +2437,19 @@ async function lmEncerrar(id) {
     mostrarToast(`⚠️ Encerrado localmente — verifique a planilha para ${nomeLm}`);
   }
 
-  // 5. Recarrega do Sheets após 3s — dá tempo ao GS de gravar
-  // Mantém os encerrados locais durante o re-fetch para evitar flash
+  // 6. Recarrega do Sheets após 2s — mantém os encerrados locais durante o re-fetch
   const nomesEncerrados = new Set(
     licencasAtivas.filter(l => l.status === "Encerrada — retornou").map(l => l.nome)
   );
   setTimeout(async () => {
-    await lmCarregarLicencas();
+    await recarregarTudo();
     // Garante que nomes recém-encerrados permanecem encerrados mesmo se GS ainda não confirmou
     licencasAtivas.forEach(l => {
       if (nomesEncerrados.has(l.nome)) l.status = "Encerrada — retornou";
     });
-    await vgCarregarVagas();
     atualizarBadge(); lmRender(); esRender();
-    mostrarToast(`✓ ${nomeLm} encerrada — planilha atualizada`);
-  }, 3000);
+    mostrarToast(`✓ ${nomeLm} encerrada — planilha sincronizada`);
+  }, 2000);
 }
 
 async function lmDefinirRetorno(id) {
@@ -2845,27 +2889,44 @@ function apRender() {
   }).join("");
 }
 
-function apEncerrar(protocolo) {
+async function apEncerrar(protocolo) {
   const ap = avisosPrevios.find(x => x.protocolo === protocolo);
   if (!ap) return;
   const vol = prompt("Nome do novo voluntário que assumiu (deixe em branco se não souber):");
   if (vol === null) return; // cancelou
-  ap.status = "Encerrado — voluntário assumiu" + (vol.trim() ? " (" + vol.trim() + ")" : "");
-  enviarAcao({ action: "encerrarAvisoPrevio", protocolo, novoVoluntario: vol.trim() });
+
+  // Remove da memória imediatamente — some da lista
+  avisosPrevios = avisosPrevios.filter(x => x.protocolo !== protocolo);
   atualizarBadge();
   apRender();
-  mostrarToast("✓ Aviso prévio encerrado para " + ap.nome);
+  mostrarToast(`Encerrando aviso prévio de ${ap.nome}…`);
+
+  const r = await enviarAcao({ action: "encerrarAvisoPrevio", protocolo, novoVoluntario: vol.trim() });
+  if (r && r.ok) {
+    mostrarToast(`✓ Aviso prévio encerrado — ${ap.nome}`);
+  } else {
+    mostrarToast(`⚠️ Erro ao encerrar — verifique a planilha para ${ap.nome}`);
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
-function apReserva(protocolo) {
+async function apReserva(protocolo) {
   const ap = avisosPrevios.find(x => x.protocolo === protocolo);
   if (!ap) return;
   if (!confirm(`Confirmar que a vaga de ${ap.nome} em ${ap.hospital} passará a ser coberta pelo reserva?`)) return;
-  ap.status = "Encerrado — vaga coberta por reserva";
-  enviarAcao({ action: "encerrarAvisoPrevioReserva", protocolo });
+
+  avisosPrevios = avisosPrevios.filter(x => x.protocolo !== protocolo);
   atualizarBadge();
   apRender();
-  mostrarToast("⚡ Vaga de " + ap.nome + " marcada para cobertura por reserva");
+  mostrarToast(`Transferindo vaga de ${ap.nome} para reserva…`);
+
+  const r = await enviarAcao({ action: "encerrarAvisoPrevioReserva", protocolo });
+  if (r && r.ok) {
+    mostrarToast(`⚡ Vaga de ${ap.nome} → cobertura por reserva`);
+  } else {
+    mostrarToast(`⚠️ Erro — verifique a planilha para ${ap.nome}`);
+  }
+  setTimeout(() => recarregarTudo(), 1500);
 }
 
 // ── Helpers
