@@ -1084,20 +1084,21 @@ function setMonitorStatus(estado) {
 })();
 
 async function carregarTudo(silencioso) {
-  if (!silencioso) setMonitorStatus("atualizando");
+  if (!silencioso) setMonitorStatus("loading");
   try {
     await Promise.all([
       carregarDados(),
-      carregarAvisosPrevios(),
-      vgCarregarVagas(),
       lmCarregarLicencas(),
+      vgCarregarVagas(),
+      carregarAvisosPrevios(),
     ]);
     esBuscarReposicoes();
-    apVerificarVencimentos();
+    esRender();
+    renderTudo();
     setMonitorStatus("ok");
   } catch(e) {
     setMonitorStatus("erro");
-    console.warn("Erro ao carregar dados:", e);
+    console.error("carregarTudo erro:", e);
   }
 }
 
@@ -1172,8 +1173,7 @@ async function carregarDados() {
     setMonitorStatus("offline");
   }
   renderTudo();
-  // Após carregar acionamentos, atualiza reposições na escala
-  esBuscarReposicoes();
+  esBuscarReposicoes(); // usa acionamentos[] já normalizados
 }
 
 async function carregarAvisosPrevios() {
@@ -1203,6 +1203,13 @@ async function carregarAvisosPrevios() {
         // CRM: remove "-undefined" ou "undefined"
         let crm = String(ap.crm || "").replace(/-?undefined/gi, "").trim();
 
+        // diasSemana pode vir como array JSON do GS
+        let diasSemana = ap.diasSemana || ap.dias_semana || "";
+        if (Array.isArray(diasSemana)) diasSemana = diasSemana.join(", ");
+        else if (typeof diasSemana === "string" && diasSemana.startsWith("[")) {
+          try { diasSemana = JSON.parse(diasSemana).join(", "); } catch(e) {}
+        }
+
         return {
           ...ap,
           dataVencISO:    vencISO,
@@ -1211,6 +1218,7 @@ async function carregarAvisosPrevios() {
           prazoDias:      Number(ap.prazoDias) || 90,
           status:         ap.status || "Ativo",
           frequencia:     ap.frequencia || "",
+          diasSemana:     diasSemana || "—",
         };
       });
     }
@@ -1226,8 +1234,33 @@ async function vgCarregarVagas() {
     const json = await resp.json();
     if (!json.ok) throw new Error("Resposta inválida");
 
-    // Reconstrói completamente a partir do Sheets
-    vagasEstruturais = json.dados.filter(v => v.status !== "Deletada");
+    // Preserva status local de vagas modificadas antes do GS confirmar
+    const preenchidasLocais = new Set(
+      vagasEstruturais.filter(v => v.status === "Preenchida").map(v => v.id)
+    );
+    const deletadasLocais = new Set(
+      vagasEstruturais.filter(v => v.status === "Deletada").map(v => v.id)
+    );
+    const voluntariosLocais = {};
+    vagasEstruturais.filter(v => v.voluntario).forEach(v => { voluntariosLocais[v.id] = v.voluntario; });
+
+    vagasEstruturais = (json.dados || [])
+      .filter(v => !deletadasLocais.has(v.id))
+      .map(v => {
+        // Normaliza dias — pode chegar como string JSON do Sheets
+        let dias = v.dias;
+        if (typeof dias === "string") {
+          try { dias = JSON.parse(dias); }
+          catch(e) { dias = dias.replace(/[\[\]"]/g,"").split(",").map(s=>s.trim()).filter(Boolean); }
+        }
+        if (!Array.isArray(dias)) dias = [];
+        return {
+          ...v,
+          dias,
+          status:    preenchidasLocais.has(v.id) ? "Preenchida" : v.status,
+          voluntario: voluntariosLocais[v.id] || v.voluntario || "",
+        };
+      });
 
     // Recalcula próximo ID
     const maxNum = vagasEstruturais.reduce((max, v) => {
@@ -1238,6 +1271,7 @@ async function vgCarregarVagas() {
 
     atualizarBadge();
     vgRender();
+    esRender();
   } catch(e) {
     console.warn("Vagas do Sheets indisponíveis:", e);
   }
@@ -1458,7 +1492,7 @@ function abrirDetalhe(protocolo) {
         </div>` : ""}
         ${a.exigeRep ? `
         <div class="dl-item"><div class="dli-label">Reposição</div><div class="dli-valor">${statusPill(a.statusRep)}</div></div>
-        <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep && a.dataRep !== "—" ? '<strong style="color:var(--verde)">📅 ' + a.dataRep + '</strong>' : '<span style="color:var(--erro);font-weight:600;">Não agendada — cobrar plantonista</span>'}</div></div>
+        <div class="dl-item"><div class="dli-label">Data reposição</div><div class="dli-valor">${a.dataRep && a.dataRep !== "—" ? '<strong style="color:var(--verde)">📅 ' + a.dataRep + (a.turnoRep ? ' · ' + a.turnoRep : '') + '</strong>' : '<span style="color:var(--erro);font-weight:600;">Não agendada — cobrar plantonista</span>'}</div></div>
         <div class="dl-item"><div class="dli-label">Turno reposição</div><div class="dli-valor">${a.turnoRep || "—"}</div></div>
         ` : ""}
       </div>
@@ -1482,34 +1516,45 @@ function fecharModalFora(e) {
 async function confirmarAtestado(protocolo) {
   const a = acionamentos.find(x => x.protocolo === protocolo);
   if (!a) return;
+  if (!confirm(`Confirmar recebimento do documento de ${a.nome}?`)) return;
+
+  // Atualiza local imediatamente
   a.statusAtestado = "Recebido";
-  a.prazo48h = "";
-  renderTudo();
-  mostrarToast("✓ Confirmando atestado de " + a.nome + "…");
+  renderPendencias();
+  renderHistorico();
+  renderStats();
+  mostrarToast(`✓ Atestado de ${a.nome} confirmado`);
 
   const r = await enviarAcao({ action: "confirmarAtestado", protocolo });
-  if (r && r.ok) {
-    mostrarToast("✓ Atestado confirmado para " + a.nome);
-  } else {
-    mostrarToast("⚠️ Erro ao confirmar — verifique a planilha para " + a.nome);
+  if (!r || !r.ok) {
+    mostrarToast("⚠️ Erro ao salvar — verifique a planilha");
+    a.statusAtestado = "Pendente"; // reverte
+    renderPendencias();
   }
-  setTimeout(() => recarregarTudo(), 1500);
 }
 
 async function confirmarReposicao(protocolo) {
   const a = acionamentos.find(x => x.protocolo === protocolo);
   if (!a) return;
+  if (!confirm(`Confirmar reposição cumprida por ${a.nome}?
+
+Data: ${a.dataRep || "—"} · ${a.turnoRep || "—"}`)) return;
+
+  // Atualiza local imediatamente
   a.statusRep = "Cumprida";
-  renderTudo();
-  mostrarToast("✓ Marcando reposição de " + a.nome + "…");
+  const card = document.getElementById("card-" + protocolo.replace(/-/g,"_"));
+  if (card) card.remove(); // sai das pendências
+  renderStats();
+  atualizarBadge();
+  esBuscarReposicoes(); // remove da escala semanal
+  mostrarToast(`✓ Reposição de ${a.nome} marcada como cumprida`);
 
   const r = await enviarAcao({ action: "confirmarReposicao", protocolo });
-  if (r && r.ok) {
-    mostrarToast("✓ Reposição cumprida — " + a.nome);
-  } else {
-    mostrarToast("⚠️ Erro ao marcar — verifique a planilha para " + a.nome);
+  if (!r || !r.ok) {
+    mostrarToast("⚠️ Erro ao salvar no servidor — verifique a planilha");
+    a.statusRep = "Pendente"; // reverte
+    renderPendencias();
   }
-  setTimeout(() => recarregarTudo(), 1500);
 }
 
 // Envia ações ao Apps Script via GET — todas as ações retornam resposta JSON legível.
@@ -1530,13 +1575,10 @@ async function enviarAcao(payload) {
 
 // Recarrega TUDO do Sheets — usado após qualquer ação de estado
 async function recarregarTudo() {
-  await Promise.all([
-    carregarDados(),
-    carregarAvisosPrevios(),
-    vgCarregarVagas(),
-    lmCarregarLicencas(),
-  ]);
+  await Promise.all([carregarDados(), lmCarregarLicencas(), vgCarregarVagas(), carregarAvisosPrevios()]);
+  esBuscarReposicoes(); // reconstrói a partir de acionamentos[] já normalizados
   esRender();
+  renderTudo();
 }
 
 // ── Filtros
@@ -1613,9 +1655,11 @@ function vgRender() {
   document.getElementById("vg-st-total").textContent      = vagasEstruturais.filter(v => v.status !== "Deletada").length;
 
   let itens = [...vagasEstruturais];
-  if (vgFiltro === "aberta")      itens = itens.filter(v => v.status === "Aberta");
-  else if (vgFiltro === "lm")     itens = itens.filter(v => v.tipo === "lm" || v.tipo === "disciplinar");
-  else if (vgFiltro === "preenchida") itens = itens.filter(v => v.status === "Preenchida");
+  // Por padrão (filtro "todos"), mostra apenas Aberta e Reserva — Preenchidas ficam no filtro próprio
+  if      (vgFiltro === "aberta")      itens = itens.filter(v => v.status === "Aberta");
+  else if (vgFiltro === "lm")          itens = itens.filter(v => v.tipo === "lm" || v.tipo === "disciplinar");
+  else if (vgFiltro === "preenchida")  itens = itens.filter(v => v.status === "Preenchida");
+  else                                 itens = itens.filter(v => v.status !== "Preenchida" && v.status !== "Deletada");
 
   const busca = document.getElementById("vg-busca").value.toLowerCase();
   if (busca) itens = itens.filter(v =>
@@ -1636,16 +1680,36 @@ function vgRender() {
                    : v.tipo === "lm"          ? "background:var(--amarelo-bg);color:var(--amarelo)"
                    :                            "background:var(--info-bg);color:var(--info)";
     const tagTxt   = v.tipo === "disciplinar" ? "Afastamento Disciplinar"
-                   : v.tipo === "lm" ? "Licença Maternidade" : "Vaga Estrutural";
-    const statusCor= v.status === "Aberta"    ? "background:var(--erro-bg);color:var(--erro)"
-                   : v.status === "Reserva"   ? "background:var(--info-bg);color:var(--info)"
-                   :                            "background:var(--verde-light);color:var(--verde)";
+                   : v.tipo === "lm"          ? "Licença Maternidade"
+                   : v.tipo === "vago_quinzenal" ? "Vaga Quinzenal"
+                   :                              "Vaga Estrutural";
+    const statusCor= v.status === "Aberta"  ? "background:var(--erro-bg);color:var(--erro)"
+                   : v.status === "Reserva" ? "background:var(--info-bg);color:var(--info)"
+                   :                          "background:var(--verde-light);color:var(--verde)";
+
+    // Dias formatados — já normalizados como array pelo vgCarregarVagas
+    const diasArr = Array.isArray(v.dias) ? v.dias : [];
+    const diasTxt = diasArr.length > 0
+      ? diasArr.map(d => {
+          const hoje = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][new Date().getDay()];
+          return d === hoje ? `<strong style="color:var(--verde);">${d}★</strong>` : d;
+        }).join(" · ")
+      : "<span style='color:var(--erro);font-size:11px;'>⚠️ dias não configurados</span>";
+
+    // Frequência: quinzenal com período, semanal, etc
+    let freqTxt = "Semanal";
+    if (v.tipo === "vago_quinzenal") {
+      freqTxt = v.quinzena ? "Quinzenal — " + v.quinzena + "ª quinzena" : "Quinzenal";
+    } else if (v.quinzena) {
+      freqTxt = "Quinzenal — " + v.quinzena + "ª quinzena";
+    }
+
     const infoExtra = v.plantonista ? `
       <div class="dc"><div class="dl">Plantonista original</div><div class="dv">${v.plantonista}</div></div>
       <div class="dc"><div class="dl">Retorno previsto</div><div class="dv">${v.retorno||"—"}</div></div>` : "";
+
     const btnAcoes = v.status !== "Preenchida" ? `
       <button class="btn-acao btn-confirmar-atestado" onclick="vgRegistrarVoluntario('${v.id}')">✓ Voluntário assumiu</button>
-      
       <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>
     ` : `<span style="font-size:12px;color:var(--verde);font-weight:600;">✓ Preenchida por ${v.voluntario}</span>
       <button class="btn-acao" style="background:var(--erro-bg);color:var(--erro);margin-left:auto;" onclick="vgDeletar('${v.id}')">✕ Remover</button>`;
@@ -1654,8 +1718,16 @@ function vgRender() {
       <div class="acion-header">
         <div class="acion-info">
           <div class="acion-nome">${v.hospital}</div>
-          <div class="acion-sub">${v.slot} · ${v.turno}</div>
-          <div class="acion-tags">
+          <div class="acion-sub" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:2px;">
+            <strong>${v.slot}</strong>
+            <span style="color:var(--cinza-4);">·</span>
+            <span>${diasTxt}</span>
+            <span style="color:var(--cinza-4);">·</span>
+            <span>${v.turno}</span>
+            <span style="color:var(--cinza-4);">·</span>
+            <span style="font-size:11px;padding:1px 7px;border-radius:10px;background:var(--cinza-1);color:var(--cinza-4);">${freqTxt}</span>
+          </div>
+          <div class="acion-tags" style="margin-top:4px;">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">${tagTxt}</span>
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${statusCor}">${v.status}</span>
           </div>
@@ -1676,18 +1748,21 @@ async function vgRegistrarVoluntario(id) {
   const nome = prompt(`Nome do voluntário que assumiu a vaga:\n${v.hospital} — ${v.slot}\n\n(A vaga sairá da lista de abertas e da Escala Semanal)`);
   if (!nome || !nome.trim()) return;
 
+  // Atualiza local imediatamente — UI otimista
   v.voluntario = nome.trim();
-  v.status = "Preenchida";
-  atualizarBadge(); vgRender(); esRender();
-  mostrarToast(`Registrando ${nome.trim()} na vaga…`);
+  v.status     = "Preenchida";
+  atualizarBadge();
+  vgRender();
+  esRender(); // remove da escala semanal imediatamente
+  mostrarToast(`✓ Vaga assumida por ${nome.trim()} — removida da escala`);
 
   const r = await enviarAcao({ action: "preencherVaga", id, voluntario: nome.trim() });
-  if (r && r.ok) {
-    mostrarToast(`✓ Vaga assumida por ${nome.trim()} — removida da escala`);
-  } else {
-    mostrarToast(`⚠️ Erro ao registrar — verifique a planilha`);
+  if (!r || !r.ok) {
+    mostrarToast("⚠️ Erro ao registrar — verifique a planilha");
+    v.status = "Aberta"; // reverte
+    v.voluntario = "";
+    vgRender(); esRender();
   }
-  setTimeout(() => recarregarTudo(), 1500);
 }
 
 async function vgAcionarReserva(id) {
@@ -1707,17 +1782,21 @@ async function vgDeletar(id) {
   const v = vagasEstruturais.find(x => x.id === id);
   if (!v) return;
   if (!confirm(`Remover esta vaga?\n${v.hospital} — ${v.slot}\n\nA vaga sairá da Escala Semanal. Esta ação não pode ser desfeita.`)) return;
+
+  // Remove local imediatamente
+  const backup = [...vagasEstruturais];
   vagasEstruturais = vagasEstruturais.filter(x => x.id !== id);
-  atualizarBadge(); vgRender(); esRender();
-  mostrarToast("Removendo vaga…");
+  atualizarBadge();
+  vgRender();
+  esRender();
+  mostrarToast(`✓ Vaga removida`);
 
   const r = await enviarAcao({ action: "deletarVaga", id });
-  if (r && r.ok) {
-    mostrarToast("✓ Vaga removida da lista e da Escala Semanal");
-  } else {
-    mostrarToast("⚠️ Erro ao remover — verifique a planilha");
+  if (!r || !r.ok) {
+    mostrarToast("⚠️ Erro ao remover — revertendo");
+    vagasEstruturais = backup;
+    vgRender(); esRender();
   }
-  setTimeout(() => recarregarTudo(), 1500);
 }
 
 let vgProxId = 1; // IDs manuais: VGM001, VGM002...
@@ -1846,71 +1925,27 @@ let esReposicoes = [];
 
 // Busca reposições do Apps Script
 function esBuscarReposicoes() {
-  // Normaliza dataRep — pode chegar como Date do Sheets, string ISO ou DD/MM/AAAA
-  function normDataRep(val) {
-    if (!val) return "";
-    if (val instanceof Date) {
-      const p = n => String(n).padStart(2,"0");
-      return `${p(val.getDate())}/${p(val.getMonth()+1)}/${val.getFullYear()}`;
-    }
-    const s = String(val).trim();
-    // ISO AAAA-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-      const [y,m,d] = s.split("T")[0].split("-");
-      return `${d}/${m}/${y}`;
-    }
-    return s;
-  }
-
-  // Reconstrói do zero a cada chamada para evitar duplicatas
+  // Usa apenas `acionamentos` já normalizado por carregarDados() — sem segundo fetch
   const manuais = esReposicoes.filter(r => r.fonte === "manual");
-  esReposicoes = [...manuais];
+  esReposicoes  = [...manuais];
 
-  // Popula dos acionamentos já em memória
   acionamentos
-    .filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep)
+    .filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep && a.dataRep !== "—")
     .forEach(a => {
-      const jaExiste = esReposicoes.some(r => r.id === a.protocolo);
-      if (!jaExiste) {
+      if (!esReposicoes.some(r => r.id === a.protocolo)) {
         esReposicoes.push({
           id:          a.protocolo,
           plantonista: a.nome,
           hospital:    a.hospital,
-          dataRep:     normDataRep(a.dataRep),
+          dataRep:     a.dataRep,
           turnoRep:    a.turnoRep || "—",
-          fonte:       "sistema"
+          fonte:       "sistema",
         });
       }
     });
 
   esRender();
-
-  // Busca do GS para complementar (acionamentos não carregados localmente)
-  if (APPS_SCRIPT_URL.includes("COLE_AQUI")) return;
-  fetch(APPS_SCRIPT_URL + "?action=listarAcionamentos")
-    .then(r => r.json())
-    .then(d => {
-      if (!d.dados) return;
-      d.dados
-        .filter(a => a.exigeRep && a.statusRep === "Pendente" && a.dataRep)
-        .forEach(a => {
-          const jaExiste = esReposicoes.some(r => r.id === a.protocolo);
-          if (!jaExiste) {
-            esReposicoes.push({
-              id:          a.protocolo,
-              plantonista: a.nome,
-              hospital:    a.hospital,
-              dataRep:     normDataRep(a.dataRep),
-              turnoRep:    a.turnoRep || "—",
-              fonte:       "sistema"
-            });
-          }
-        });
-      esRender();
-    })
-    .catch(() => {});
 }
-
 function esAbrirModalRep() {
   document.getElementById("es-rep-nome").value = "";
   document.getElementById("es-rep-data").value = "";
@@ -2509,6 +2544,7 @@ function lmConverterParaLM(id) {
       l.status = "Encerrada — convertida para LM";
       enviarAcao({ action: "encerrarLicenca", id: l.id, nome: l.nome, status: l.status });
     });
+  esRender(); // Remove da escala semanal imediatamente
 
   // Coleta os dias das licenças gestacionais para criar as novas linhas de LM
   const diasGest = [];
@@ -2730,15 +2766,24 @@ async function lmCarregarLicencas() {
         .map(l => l.nome + "|" + l.tipo)
     );
 
-    licencasAtivas = (json.dados || []).map(lm => ({
-      ...lm,
-      inicio:  normData(lm.inicio),
-      retorno: normData(lm.retorno),
-      // Mantém encerramento local se o GS ainda não confirmou
-      status: encerradasLocais.has(lm.nome + "|" + lm.tipo)
-        ? "Encerrada — retornou"
-        : lm.status,
-    }));
+    licencasAtivas = (json.dados || []).map(lm => {
+      // Normaliza dias — pode chegar como string JSON
+      let dias = lm.dias;
+      if (typeof dias === "string") {
+        try { dias = JSON.parse(dias); }
+        catch(e) { dias = dias.replace(/[\[\]"]/g,"").split(",").map(s=>s.trim()).filter(Boolean); }
+      }
+      if (!Array.isArray(dias)) dias = [];
+      return {
+        ...lm,
+        dias,
+        inicio:  normData(lm.inicio),
+        retorno: normData(lm.retorno),
+        status: encerradasLocais.has(lm.nome + "|" + lm.tipo)
+          ? "Encerrada — retornou"
+          : lm.status,
+      };
+    });
 
     ES_ACIONAMENTOS_FIXOS.length = 0;
     licencasAtivas
@@ -2862,7 +2907,7 @@ function apRender() {
         <div class="acion-avatar" style="background:${urg==="critico"||urg==="vencido"?"var(--erro-bg)":urg==="urgente"?"var(--alerta-bg)":urg==="encerrado"?"var(--cinza-1)":"var(--verde-light)"};color:${urg==="critico"||urg==="vencido"?"var(--erro)":urg==="urgente"?"var(--alerta)":urg==="encerrado"?"var(--cinza-4)":"var(--verde)"};">${ap.nome.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase()}</div>
         <div class="acion-info">
           <div class="acion-nome">${ap.nome}${ap.crm ? '<span style="font-weight:400;font-size:12px;color:var(--cinza-4);margin-left:6px;">CRM ' + ap.crm + '</span>' : ''}</div>
-          <div class="acion-sub">${ap.hospital} · ${ap.turno} · ${ap.diasSemana}${ap.frequencia ? ' · ' + ap.frequencia : ''}</div>
+          <div class="acion-sub">${ap.hospital || "—"} · ${ap.turno || "—"} · ${ap.diasSemana || "—"}${ap.frequencia ? ' · ' + ap.frequencia : ''}</div>
           <div class="acion-tags">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;${tagCor}">⏱ ${tagTxt}</span>
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--cinza-1);color:var(--cinza-4);">${ap.prazoDias}d · Vence ${ap.dataVencimento}</span>
