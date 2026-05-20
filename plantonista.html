@@ -556,7 +556,7 @@ table { min-width: 600px; }
         </div>
         <div class="campo-grupo">
           <label for="a-data-plantao">Data do plantão <span class="req">*</span></label>
-          <input type="date" id="a-data-plantao">
+          <input type="date" id="a-data-plantao" onchange="onDiasAfastamentoChange()">
           <div class="msg-erro" id="erro-a-data">Campo obrigatório.</div>
         </div>
       </div>
@@ -642,6 +642,20 @@ table { min-width: 600px; }
             <option value="menor72">Menos de 72 horas (reposição obrigatória)</option>
             <option value="maior72">72 horas ou mais (sem reposição)</option>
           </select>
+          <!-- Dias de afastamento — campo extra para calcular validade do comprovante -->
+          <div style="margin-top:10px">
+            <label style="font-size:12px;font-weight:600;color:var(--texto-2);display:block;margin-bottom:5px">
+              Dias de afastamento <span style="font-weight:400;color:var(--cinza-4)">(para calcular validade do comprovante)</span>
+            </label>
+            <input type="number" id="a-dias-afastamento" min="1" max="365"
+              placeholder="Ex: 3" style="width:100%"
+              oninput="onDiasAfastamentoChange()">
+          </div>
+          <!-- Validade calculada automaticamente -->
+          <div id="duracao-validade-info" style="display:none;margin-top:8px;padding:9px 13px;
+            background:var(--verde-light);border-left:3px solid var(--verde);
+            border-radius:0 var(--r) var(--r) 0;font-size:13px;color:var(--verde)">
+          </div>
           <div class="msg-erro" id="erro-a-duracao">Campo obrigatório.</div>
         </div>
 
@@ -667,6 +681,35 @@ table { min-width: 600px; }
               <div class="msg-erro" id="erro-a-turno-rep">Campo obrigatório.</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Múltiplos plantões cobertos pelo mesmo atestado -->
+      <div id="bloco-multiplos" class="bloco-cond" style="margin-top:4px">
+        <div class="campo-grupo">
+          <label style="font-size:14px;font-weight:600">Este atestado contempla mais de um plantão?</label>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer">
+              <input type="radio" name="multi-plantao" value="nao" checked
+                onchange="onMultiPlantaoChange()"> Não
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;cursor:pointer">
+              <input type="radio" name="multi-plantao" value="sim"
+                onchange="onMultiPlantaoChange()"> Sim
+            </label>
+          </div>
+        </div>
+
+        <!-- Lista de plantões adicionais -->
+        <div id="bloco-plantoes-extras" style="display:none">
+          <div class="aviso-inline" style="margin-bottom:12px">
+            📋 Informe os plantões adicionais cobertos por este atestado. O comprovante listará todos.
+          </div>
+          <div id="lista-plantoes-extras"></div>
+          <button type="button" class="btn-secundario" onclick="adicionarPlantaoExtra()"
+            style="margin-top:8px;display:flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px dashed var(--verde);background:var(--verde-light);color:var(--verde);border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer">
+            + Adicionar outro plantão
+          </button>
         </div>
       </div>
 
@@ -1168,6 +1211,7 @@ function onMotivoChange() {
   const isDisc = m === "Afastamento disciplinar";
 
   campo("bloco-atestado-ac").classList.toggle("vis", isAM);
+  campo("bloco-multiplos").classList.toggle("vis", isAM);
   campo("bloco-lm").classList.toggle("vis", isLM);
   campo("bloco-gestacional").classList.toggle("vis", isGest);
 
@@ -1199,9 +1243,188 @@ function onMotivoChange() {
   }
 }
 
+// Calcula e exibe a validade do comprovante a partir dos dias de afastamento
+function onDiasAfastamentoChange() {
+  const dias       = parseInt(campo("a-dias-afastamento")?.value || "0") || 0;
+  const dataStr    = val("a-data-plantao");
+  const infoEl     = campo("duracao-validade-info");
+  if (!infoEl) return;
+
+  if (!dias) {
+    infoEl.style.display = "none";
+    return;
+  }
+
+  if (!dataStr) {
+    infoEl.style.display = "block";
+    infoEl.innerHTML = `📋 <strong>${dias} dia${dias > 1 ? "s" : ""} de afastamento</strong> — informe a data do plantão para calcular a validade exata.`;
+    return;
+  }
+
+  const [y, m, d] = dataStr.split("-").map(Number);
+  const inicio = new Date(y, m - 1, d);
+  const fim    = new Date(y, m - 1, d + dias - 1); // inclui o dia inicial
+  const p      = n => String(n).padStart(2, "0");
+  const fmtIni = `${p(inicio.getDate())}/${p(inicio.getMonth()+1)}/${inicio.getFullYear()}`;
+  const fmtFim = `${p(fim.getDate())}/${p(fim.getMonth()+1)}/${fim.getFullYear()}`;
+
+  infoEl.style.display = "block";
+  infoEl.innerHTML =
+    `📋 <strong>Período de afastamento:</strong> ${fmtIni} a ${fmtFim} (${dias} dia${dias > 1 ? "s" : ""})<br>` +
+    `✅ <strong>Comprovante válido até ${fmtFim}</strong> — nenhum novo preenchimento necessário neste período`;
+}
+
 function onDuracaoChange() {
   const d = val("a-duracao-atestado");
+  // Quando a data do plantão também estiver preenchida, recalcula a validade
+  onDiasAfastamentoChange();
+
+  // Mostra/oculta bloco de reposição (regra binária original)
+  const exigeRep = d === "menor72";
   campo("bloco-reposicao").classList.toggle("vis", d === "menor72");
+}
+
+// ════ MÚLTIPLOS PLANTÕES ════
+
+let _plantoesExtras = []; // [{id, hospital, setor, data, turno, reposicao: {data, turno}}]
+let _peCont = 0;
+
+const HOSPITAIS_RECENTES = []; // preenchido com o hospital principal ao submeter
+
+function onMultiPlantaoChange() {
+  const sim = document.querySelector('input[name="multi-plantao"]:checked')?.value === "sim";
+  const bloco = campo("bloco-plantoes-extras");
+  if (!bloco) return;
+  bloco.style.display = sim ? "block" : "none";
+  if (sim && _plantoesExtras.length === 0) adicionarPlantaoExtra();
+}
+
+function adicionarPlantaoExtra() {
+  _peCont++;
+  const id = "pe-" + _peCont;
+  const exige = val("a-duracao-atestado") === "menor72";
+
+  _plantoesExtras.push({ id, hospital: "", setor: "", data: "", turno: "", rep: { data: "", turno: "" } });
+
+  const div = document.createElement("div");
+  div.id = id;
+  div.style.cssText = "background:var(--cinza-0);border:1px solid var(--cinza-2);border-radius:var(--r);padding:14px;margin-bottom:10px;position:relative";
+  div.innerHTML = `
+    <button type="button" onclick="removerPlantaoExtra('${id}')"
+      style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--cinza-3);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    <div style="font-weight:600;font-size:13px;color:var(--verde-dark);margin-bottom:10px">Plantão adicional ${_peCont}</div>
+    <div class="dois-col">
+      <div class="campo-grupo">
+        <label>Hospital *</label>
+        <input type="text" id="${id}-hospital" placeholder="Nome do hospital"
+          value="${val('a-hospital') || ''}"
+          oninput="atualizarPE('${id}','hospital',this.value)" style="width:100%">
+      </div>
+      <div class="campo-grupo">
+        <label>Setor / Especialidade</label>
+        <input type="text" id="${id}-setor" placeholder="Opcional"
+          oninput="atualizarPE('${id}','setor',this.value)" style="width:100%">
+      </div>
+    </div>
+    <div class="dois-col">
+      <div class="campo-grupo">
+        <label>Data do plantão *</label>
+        <input type="date" id="${id}-data"
+          oninput="atualizarPE('${id}','data',this.value)" style="width:100%">
+        <div class="msg-erro" id="err-${id}-data">Campo obrigatório.</div>
+      </div>
+      <div class="campo-grupo">
+        <label>Turno *</label>
+        <select id="${id}-turno" oninput="atualizarPE('${id}','turno',this.value)" style="width:100%">
+          <option value="">Selecione…</option>
+          <option>Diurno (07h–19h)</option>
+          <option>Noturno (19h–07h)</option>
+          <option>Manhã (07h–13h)</option>
+          <option>Tarde (13h–19h)</option>
+        </select>
+        <div class="msg-erro" id="err-${id}-turno">Campo obrigatório.</div>
+      </div>
+    </div>
+    ${exige ? `
+    <div style="background:var(--alerta-bg);border-left:3px solid var(--alerta);border-radius:0 var(--r) var(--r) 0;padding:10px 12px;margin-top:4px">
+      <div style="font-size:12px;font-weight:600;color:var(--alerta);margin-bottom:8px">⚠️ Atestado &lt; 72h — informe a data de reposição deste plantão</div>
+      <div class="dois-col">
+        <div class="campo-grupo">
+          <label>Data da reposição *</label>
+          <input type="date" id="${id}-rep-data"
+            oninput="atualizarPERep('${id}','data',this.value)" style="width:100%">
+          <div class="msg-erro" id="err-${id}-rep-data">Campo obrigatório.</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Turno da reposição *</label>
+          <select id="${id}-rep-turno" oninput="atualizarPERep('${id}','turno',this.value)" style="width:100%">
+            <option value="">Selecione…</option>
+            <option>Diurno (07h–19h)</option>
+            <option>Noturno (19h–07h)</option>
+            <option>Manhã (07h–13h)</option>
+            <option>Tarde (13h–19h)</option>
+          </select>
+          <div class="msg-erro" id="err-${id}-rep-turno">Campo obrigatório.</div>
+        </div>
+      </div>
+    </div>` : ""}
+  `;
+  document.getElementById("lista-plantoes-extras").appendChild(div);
+}
+
+function removerPlantaoExtra(id) {
+  _plantoesExtras = _plantoesExtras.filter(p => p.id !== id);
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function atualizarPE(id, campo_, valor) {
+  const pe = _plantoesExtras.find(p => p.id === id);
+  if (pe) pe[campo_] = valor;
+}
+
+function atualizarPERep(id, campo_, valor) {
+  const pe = _plantoesExtras.find(p => p.id === id);
+  if (pe) pe.rep[campo_] = valor;
+}
+
+function validarPlantoesPE(exigeRep) {
+  let ok = true;
+  _plantoesExtras.forEach(pe => {
+    if (!document.getElementById(pe.id)) return; // foi removido
+    const data  = document.getElementById(pe.id + "-data")?.value;
+    const turno = document.getElementById(pe.id + "-turno")?.value;
+    const errData  = document.getElementById("err-" + pe.id + "-data");
+    const errTurno = document.getElementById("err-" + pe.id + "-turno");
+    if (!data)  { if (errData)  errData.style.display  = "block"; ok = false; }
+    else          if (errData)  errData.style.display  = "none";
+    if (!turno) { if (errTurno) errTurno.style.display = "block"; ok = false; }
+    else          if (errTurno) errTurno.style.display = "none";
+    if (exigeRep) {
+      const repData  = document.getElementById(pe.id + "-rep-data")?.value;
+      const repTurno = document.getElementById(pe.id + "-rep-turno")?.value;
+      const errRD    = document.getElementById("err-" + pe.id + "-rep-data");
+      const errRT    = document.getElementById("err-" + pe.id + "-rep-turno");
+      if (!repData)  { if (errRD) errRD.style.display  = "block"; ok = false; }
+      else             if (errRD) errRD.style.display  = "none";
+      if (!repTurno) { if (errRT) errRT.style.display = "block"; ok = false; }
+      else             if (errRT) errRT.style.display = "none";
+    }
+    // Lê valores atuais
+    pe.hospital = document.getElementById(pe.id + "-hospital")?.value || "";
+    pe.setor    = document.getElementById(pe.id + "-setor")?.value    || "";
+    pe.data     = data  || "";
+    pe.turno    = turno || "";
+    if (exigeRep) {
+      pe.rep.data  = document.getElementById(pe.id + "-rep-data")?.value  || "";
+      pe.rep.turno = document.getElementById(pe.id + "-rep-turno")?.value || "";
+    }
+  });
+  return ok;
+}
+
+function plantoesExtraVisiveis() {
+  return _plantoesExtras.filter(pe => document.getElementById(pe.id));
 }
 
 async function enviarAcionamento() {
@@ -1228,17 +1451,36 @@ async function enviarAcionamento() {
   const m = val("a-motivo");
   const isAM = m === "Doença/Atestado Médico" || m.includes("Internamento") || m.includes("Cirurgia") || m.includes("Afastamento temporário");
 
-  if (isAM && !val("a-duracao-atestado")) {
+  // Valida duração: obrigatória para AM; se "outro", exige o campo livre
+  const duracaoVal = val("a-duracao-atestado");
+  const diasLivreVal = duracaoVal === "outro" ? val("a-dias-livre") : "ok";
+  if (isAM && !duracaoVal) {
+    marcarErro("erro-a-duracao", true);
+    ok = false;
+  } else if (isAM && duracaoVal === "outro" && !diasLivreVal.trim()) {
     marcarErro("erro-a-duracao", true);
     ok = false;
   } else marcarErro("erro-a-duracao", false);
 
-  if (val("a-duracao-atestado") === "menor72") {
+  const duracaoNumFinal = (() => {
+    if (!duracaoVal) return 0;
+    if (duracaoVal === "outro") return parseInt(diasLivreVal||"0")||0;
+    if (duracaoVal === "menor72") return 1;
+    if (duracaoVal === "maior72") return 7;
+    return parseInt(duracaoVal)||0;
+  })();
+
+  if (duracaoNumFinal > 0 && duracaoNumFinal < 3) {
     if (!val("a-data-rep"))   { marcarErro("erro-a-data-rep",   true); ok = false; }
     else                       marcarErro("erro-a-data-rep",  false);
     if (!val("a-turno-rep"))  { marcarErro("erro-a-turno-rep",  true); ok = false; }
     else                       marcarErro("erro-a-turno-rep", false);
   }
+
+  // Valida plantões extras se marcado "sim"
+  const multiSim = document.querySelector('input[name="multi-plantao"]:checked')?.value === "sim";
+  const isExige  = val("a-duracao-atestado") === "menor72";
+  if (multiSim && !validarPlantoesPE(isExige)) ok = false;
 
   if (!ok) return;
 
@@ -1262,13 +1504,47 @@ async function enviarAcionamento() {
       dataPlantao:   val("a-data-plantao"),
       turno:         val("a-turno"),
       motivo:        m,
-      duracaoAtestado: val("a-duracao-atestado"),
+      duracaoAtestado: (() => {
+        const d = val("a-duracao-atestado");
+        if (!d) return "";
+        if (d === "outro") return val("a-dias-livre") || "";
+        return d; // número de dias como string
+      })(),
+      diasAfastamento: (() => {
+        const d = val("a-duracao-atestado");
+        if (d === "outro") return parseInt(val("a-dias-livre")||"0") || 0;
+        if (d && d !== "menor72" && d !== "maior72") return parseInt(d) || 0;
+        if (d === "menor72") return 1;
+        if (d === "maior72") return 7;
+        return 0;
+      })(),
+      dataFimAfastamento: (() => {
+        const d = val("a-duracao-atestado");
+        const dp = val("a-data-plantao");
+        if (!dp) return "";
+        const dias = d === "outro" ? parseInt(val("a-dias-livre")||"0") || 0
+                   : d === "menor72" ? 1 : d === "maior72" ? 7
+                   : parseInt(d) || 0;
+        if (!dias) return "";
+        const [y,m,day] = dp.split("-").map(Number);
+        const fim = new Date(y, m-1, day + dias - 1);
+        return `${String(fim.getDate()).padStart(2,"0")}/${String(fim.getMonth()+1).padStart(2,"0")}/${fim.getFullYear()}`;
+      })(),
       dataReposicao:   val("a-data-rep"),
       turnoReposicao:  val("a-turno-rep"),
       temAtestado:     campo("a-foto").files.length > 0,
       semanasGest:     val("a-semanas-gest"),
       inicioLM:        val("a-inicio-lm"),
       obs:             val("a-obs"),
+      // Plantões adicionais cobertos pelo mesmo atestado
+      plantoesAdicionais: multiSim ? plantoesExtraVisiveis().map(pe => ({
+        hospital:    pe.hospital || dados.hospital,
+        setor:       pe.setor   || "",
+        data:        pe.data,
+        turno:       pe.turno,
+        dataRep:     pe.rep.data  || "",
+        turnoRep:    pe.rep.turno || "",
+      })) : [],
     };
 
     // Anexa atestado se houver
@@ -1287,17 +1563,48 @@ async function enviarAcionamento() {
     if (val("a-duracao-atestado") === "menor72")
       alertas.push(`Reposição agendada para <strong>${formatarData(val("a-data-rep"))} — ${val("a-turno-rep")}</strong>.`);
 
+    // Calcula data de fim para exibir no comprovante
+    const diasNum = dados.diasAfastamento || 0;
+    const fimCob  = dados.dataFimAfastamento || "";
+    const extras  = dados.plantoesAdicionais || [];
+    const exigeRepFinal = val("a-duracao-atestado") === "menor72";
+
+    // Linhas de plantões adicionais no comprovante
+    const linhasExtras = [];
+    extras.forEach((pe, i) => {
+      linhasExtras.push([`Plantão extra ${i+1}`,
+        `${formatarData(pe.data)} — ${pe.turno}` +
+        (pe.hospital && pe.hospital !== dados.hospital ? ` · ${pe.hospital}` : "") +
+        (pe.setor ? ` · ${pe.setor}` : "")
+      ]);
+      if (pe.dataRep) linhasExtras.push([`  ↳ Reposição`, `${formatarData(pe.dataRep)} — ${pe.turnoRep}`]);
+    });
+
+    // Alertas de reposição para plantões extras
+    if (exigeRepFinal && extras.length > 0) {
+      alertas.push(`Reposições de plantões extras agendadas: ${extras.map((pe,i) =>
+        `<strong>${formatarData(pe.dataRep)} — ${pe.turnoRep}</strong>`).join(", ")}.`);
+    }
+
     mostrarComprovante({
-      titulo: "Acionamento registrado!",
-      subtitulo: "O coordenador e a comissão foram notificados.",
+      titulo:    "Acionamento registrado!",
+      subtitulo: extras.length > 0
+        ? `${1 + extras.length} plantões registrados — comprovante único`
+        : "O coordenador e a comissão foram notificados.",
       protocolo,
       linhas: [
         ["Plantonista", dados.nome + (dados.crm ? ` — CRM-${dados.crmUf} ${dados.crm}` : "")],
-        ["Hospital",    dados.hospital + (dados.setor ? ` / ${dados.setor}` : "")],
-        ["Data",        formatarData(dados.dataPlantao) + " — " + dados.turno],
         ["Motivo",      dados.motivo],
-        ["Atestado",    dados.temAtestado ? "Anexado" : "Pendente — 24h para enviar"],
-        ...(dados.dataReposicao ? [["Reposição", formatarData(dados.dataReposicao) + " — " + dados.turnoReposicao]] : []),
+        ...(diasNum ? [["Afastamento", `${diasNum} dia${diasNum > 1 ? "s" : ""}${fimCob ? " — válido até " + fimCob : ""}`]] : []),
+        // Plantão principal
+        ["Plantão 1",  `${formatarData(dados.dataPlantao)} — ${dados.turno}` +
+          (dados.hospital ? ` · ${dados.hospital}${dados.setor ? " / " + dados.setor : ""}` : "")],
+        ...(dados.dataReposicao ? [["  ↳ Reposição", `${formatarData(dados.dataReposicao)} — ${dados.turnoReposicao}`]] : []),
+        // Plantões adicionais
+        ...linhasExtras,
+        // Validade e atestado
+        ...(fimCob ? [["Válido até", `📅 ${fimCob} — comprovante único para todos os plantões acima`]] : []),
+        ["Atestado",   dados.temAtestado ? "Anexado" : "Pendente — 24h para enviar"],
       ],
       alertas
     });
@@ -1603,7 +1910,7 @@ async function enviarAvisoPrevio() {
 // ── LIMPEZA
 function limparTodos() {
   ["a-nome","a-email","a-crm","a-hospital","a-setor","a-ano-coop",
-   "a-data-plantao","a-turno","a-motivo","a-duracao-atestado",
+   "a-data-plantao","a-turno","a-motivo","a-duracao-atestado","a-dias-afastamento",
    "a-data-rep","a-turno-rep","a-obs","a-semanas-gest","a-inicio-lm",
    "at-protocolo","at-nome","at-email",
    "ap-nome","ap-crm","ap-email","ap-telefone","ap-hospital","ap-setor","ap-turno","ap-data-inicio","ap-obs"
