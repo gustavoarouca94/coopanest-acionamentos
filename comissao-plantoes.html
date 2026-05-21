@@ -988,7 +988,7 @@ function renderLic() {
     const isAtiva = l.status==="Ativa";
     const btns = [];
     if (isAtiva) {
-      if (l.tipo==="gestacional") btns.push(`<button class="btn btn-amarelo btn-sm" onclick="acaoConverterLM('${l.id}')">🍼 Parto — iniciar LM</button>`);
+      if (l.tipo==="gestacional") btns.push(`<button class="btn btn-amarelo btn-sm" data-id="${l.id}" onclick="acaoConverterLM(this.dataset.id)">🍼 Parto — iniciar LM</button>`);
       btns.push(`<button class="btn btn-verde btn-sm" data-id="${l.id}" data-nome="${l.nome}" onclick="acaoEncerrarLicenca(this.dataset.id,this.dataset.nome)">✓ Encerrar — retornou</button>`);
       btns.push(`<button class="btn btn-info btn-sm" data-id="${l.id}" data-nome="${l.nome}" onclick="acaoDefinirRetorno(this.dataset.id,this.dataset.nome)">📅 Definir retorno</button>`);
     }
@@ -997,7 +997,8 @@ function renderLic() {
       ? l.plantoes.map(p=>`<span style="display:block;font-size:12px;color:var(--cinza-3)">📍 ${p}</span>`).join("")
       : l.hospital?`<span style="font-size:12px;color:var(--cinza-3)">📍 ${l.hospital}</span>`:"";
 
-    return `<div class="card" style="border-left:4px solid ${tipoCor==='cinza'?'var(--cinza-2)':tipoCor==='amarelo'?'var(--amarelo)':tipoCor==='info'?'var(--info)':tipoCor==='erro'?'var(--erro)':'var(--cinza-2)'}" id="lic-${l.id}">
+    const borderCor = tipoCor==="cinza"?"var(--cinza-2)":tipoCor==="amarelo"?"var(--amarelo)":tipoCor==="info"?"var(--info)":tipoCor==="erro"?"var(--erro)":"var(--cinza-2)";
+    return `<div class="card" style="border-left:4px solid ${borderCor}" id="lic-${l.id}">
       <div class="card-hdr">
         <div>
           <div style="font-weight:700;font-size:14px">${l.nome}</div>
