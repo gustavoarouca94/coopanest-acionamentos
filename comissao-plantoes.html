@@ -698,8 +698,14 @@ function normAcionamento(a) {
       : "Pendente";
   }
 
+  const protStr    = normStr(a.protocolo);
+  const isExtra    = /\-P\d+$/.test(protStr);
+  const protBase   = isExtra ? protStr.replace(/\-P\d+$/, "") : protStr;
+
   return {
-    protocolo:      normStr(a.protocolo),
+    protocolo:      protStr,
+    protocoloBase:  protBase,
+    isPlantaoExtra: isExtra,
     dataHora:       normStr(a.dataHora || a.data_hora || ""),
     nome:           normStr(a.nome || a.plantonista || ""),
     email:          normStr(a.email || ""),
@@ -966,6 +972,7 @@ function cardAcionamento(a) {
   const tags = [];
   if (a.motivo==="Doença/Atestado Médico") tags.push(mkTag("Atestado médico","alerta"));
   if (a.motivo==="Afastamento disciplinar") tags.push(mkTag("Disciplinar","erro"));
+  if (a.isPlantaoExtra) tags.push(mkTag("↳ Plantão extra · "+a.protocoloBase,"amarelo"));
   if (isPendAtestado(a)&&!isVencido(a)) tags.push(mkTag("⏱ Atestado pendente","alerta"));
   if (isVencido(a)) tags.push(mkTag("🔴 Prazo vencido","erro"));
   if (a.exigeRep&&a.statusRep==="Pendente") tags.push(mkTag("🔄 Reposição pendente","info"));
@@ -1045,8 +1052,11 @@ function renderHist() {
     tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--cinza-3)">Nenhum registro.</td></tr>`;
     return;
   }
-  tb.innerHTML = itens.map((a,i)=>`<tr style="border-bottom:1px solid var(--cinza-1);background:${i%2===0?'#fff':'var(--cinza-0)'}">
-    <td style="padding:9px 14px;font-size:11px;font-family:var(--mono);color:var(--cinza-3)">${a.protocolo}</td>
+  tb.innerHTML = itens.map((a,i)=>`<tr style="border-bottom:1px solid var(--cinza-1);background:${a.isPlantaoExtra?'var(--amarelo-bg)':i%2===0?'#fff':'var(--cinza-0)'}">
+    <td style="padding:9px 14px;font-size:11px;font-family:var(--mono);color:var(--cinza-3)">
+      ${a.protocolo}
+      ${a.isPlantaoExtra?`<div style="font-size:10px;color:var(--amarelo);font-weight:600">↳ ${a.protocoloBase}</div>`:""}
+    </td>
     <td style="padding:9px 14px;font-weight:600">${a.nome}</td>
     <td style="padding:9px 14px;font-size:12px">${a.dataPlantao||"—"}<br><span style="color:var(--cinza-3)">${a.turno||""}</span></td>
     <td style="padding:9px 14px;font-size:12px">${a.motivo||"—"}</td>
@@ -1182,8 +1192,8 @@ function renderAv() {
 
     const btns = [];
     if (isAtivo) {
-      btns.push(`<button class="btn btn-verde btn-sm" onclick="acaoEncerrarAviso('${ap.protocolo}','${ap.nome.replace(/'/g,"\\'")}')">✓ Voluntário assumiu</button>`);
-      btns.push(`<button class="btn btn-info btn-sm" onclick="acaoEncerrarAvisoReserva('${ap.protocolo}','${ap.nome.replace(/'/g,"\\'")}')">⚡ Cobertura por reserva</button>`);
+      btns.push(`<button class="btn btn-verde btn-sm" data-prot="${ap.protocolo}" data-nome="${ap.nome}" onclick="acaoEncerrarAviso(this.dataset.prot,this.dataset.nome)">✓ Voluntário assumiu</button>`);
+      btns.push(`<button class="btn btn-info btn-sm" data-prot="${ap.protocolo}" onclick="acaoEncerrarAvisoReserva(this.dataset.prot)">⚡ Cobrir por reserva</button>`);
     }
 
     return `<div class="card" style="border-left:4px solid ${cor}">
@@ -1252,10 +1262,10 @@ function renderVg() {
     if (v.status==="Aberta") {
       btns = `<button class="btn btn-verde btn-sm" onclick="acaoPreencherVaga('${v.id}')">✓ Voluntário assumiu</button>
               <button class="btn btn-info btn-sm" onclick="acaoVagaReserva('${v.id}')">⚡ Cobrir por reserva</button>
-              <button class="btn btn-erro btn-sm" onclick="acaoDeletarVaga('${v.id}','${v.hospital.replace(/'/g,"\\'")}')">✕ Remover</button>`;
+               <button class="btn btn-erro btn-sm" data-id="${v.id}" onclick="acaoDeletarVaga(this.dataset.id)">✕ Remover</button>`
     } else {
       btns = `<span style="font-size:12px;color:var(--verde);font-weight:600">✓ ${v.voluntario||"Preenchida"}</span>
-              <button class="btn btn-erro btn-sm" onclick="acaoDeletarVaga('${v.id}','${v.hospital.replace(/'/g,"\\'")}')">✕ Remover</button>`;
+               <button class="btn btn-erro btn-sm" data-id="${v.id}" onclick="acaoDeletarVaga(this.dataset.id)">✕ Remover</button>`;
     }
 
     return `<div class="card" id="vg-${v.id}">
@@ -1786,6 +1796,18 @@ async function acaoRepNaoCumprida(protocolo) {
   a.statusRep = status;
   renderTudo(); toast("⚠️ Reposição marcada como não cumprida");
   try { await apiPost({action:"marcarRepNaoCumprida",protocolo,motivo}); } catch(e) {}
+}
+
+async function acaoDefinirRetorno(id) {
+  const l = licencas.find(x=>x.id===id);
+  if (!l) return;
+  const nova = prompt("Nova data de retorno previsto (DD/MM/AAAA):\nAtual: "+(l.retorno||"Em aberto"));
+  if (!nova || !nova.trim()) return;
+  const dataFmt = nova.trim();
+  licencas = licencas.map(x=>x.id===id?{...x,retorno:dataFmt}:x);
+  renderTudo(); toast("📅 Data de retorno atualizada — "+l.nome);
+  try { await apiPost({action:"definirRetornoLicenca",id,retorno:dataFmt}); }
+  catch(e) { toast("⚠️ Erro ao salvar","erro"); }
 }
 
 async function acaoEncerrarLicenca(id, nome) {
