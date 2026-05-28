@@ -467,38 +467,9 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
         <input type="date" id="lic-retorno">
         <div class="hint" id="lic-retorno-hint"></div>
       </div>
-      <div class="dois-col">
-        <div class="campo">
-          <label>Hospital / unidade</label>
-          <input type="text" id="lic-hospital" placeholder="Ex: IMIP, HAM…">
-        </div>
-        <div class="campo">
-          <label>Slot / turno na escala</label>
-          <input type="text" id="lic-slot" placeholder="Ex: Seg diurno 12h">
-        </div>
-      </div>
-      <div class="campo">
-        <label>Turno</label>
-        <select id="lic-turno">
-          <option value="">Selecione…</option>
-          <option>Diurno (07h–19h)</option>
-          <option>Noturno (19h–07h)</option>
-          <option>Manhã (07h–13h)</option>
-          <option>Tarde (13h–19h)</option>
-        </select>
-      </div>
-      <div class="campo">
-        <label>Dias da semana</label>
-        <div class="dias-check" id="lic-dias-check">
-          <label><input type="checkbox" value="Seg"><span>Seg</span></label>
-          <label><input type="checkbox" value="Ter"><span>Ter</span></label>
-          <label><input type="checkbox" value="Qua"><span>Qua</span></label>
-          <label><input type="checkbox" value="Qui"><span>Qui</span></label>
-          <label><input type="checkbox" value="Sex"><span>Sex</span></label>
-          <label><input type="checkbox" value="Sáb"><span>Sáb</span></label>
-          <label><input type="checkbox" value="Dom"><span>Dom</span></label>
-        </div>
-      </div>
+      <!-- Plantões dinâmicos -->
+      <div id="lic-plantoes-wrap"></div>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="licAdicionarPlantao()">＋ Adicionar plantão</button>
       <div class="campo">
         <label>Observações</label>
         <textarea id="lic-obs" rows="2" placeholder="Informações adicionais…"></textarea>
@@ -1626,13 +1597,76 @@ async function salvarRetorno() {
 }
 
 // ── Modal nova licença
+function licPlantaoHTML(idx) {
+  const removeBtn = idx > 0
+    ? `<button type="button" onclick="licRemoverPlantao(${idx})" style="background:none;border:none;color:var(--erro);cursor:pointer;font-size:13px;float:right">✕ remover</button>`
+    : "";
+  return `<div class="lic-plantao-bloco" data-idx="${idx}" style="border:1px solid var(--cinza-1);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--cinza-0)">
+    <div style="font-size:12px;font-weight:700;color:var(--verde);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <span>Plantão ${idx+1}</span>${removeBtn}
+    </div>
+    <div class="dois-col">
+      <div class="campo">
+        <label>Hospital / unidade</label>
+        <input type="text" class="lic-hospital" placeholder="Ex: IMIP, HAM…">
+      </div>
+      <div class="campo">
+        <label>Slot na escala</label>
+        <input type="text" class="lic-slot" placeholder="Ex: Seg diurno 12h">
+      </div>
+    </div>
+    <div class="campo">
+      <label>Turno</label>
+      <select class="lic-turno">
+        <option value="">Selecione…</option>
+        <option>Diurno (07h–19h)</option>
+        <option>Noturno (19h–07h)</option>
+        <option>Manhã (07h–13h)</option>
+        <option>Tarde (13h–19h)</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label>Dias da semana</label>
+      <div class="dias-check lic-dias-check">
+        <label><input type="checkbox" value="Seg"><span>Seg</span></label>
+        <label><input type="checkbox" value="Ter"><span>Ter</span></label>
+        <label><input type="checkbox" value="Qua"><span>Qua</span></label>
+        <label><input type="checkbox" value="Qui"><span>Qui</span></label>
+        <label><input type="checkbox" value="Sex"><span>Sex</span></label>
+        <label><input type="checkbox" value="Sáb"><span>Sáb</span></label>
+        <label><input type="checkbox" value="Dom"><span>Dom</span></label>
+      </div>
+    </div>
+  </div>`;
+}
+
+function licAdicionarPlantao() {
+  const wrap = document.getElementById("lic-plantoes-wrap");
+  const idx  = wrap.querySelectorAll(".lic-plantao-bloco").length;
+  wrap.insertAdjacentHTML("beforeend", licPlantaoHTML(idx));
+}
+
+function licRemoverPlantao(idx) {
+  const bloco = document.querySelector(`.lic-plantao-bloco[data-idx="${idx}"]`);
+  if (bloco) bloco.remove();
+  // Renumera títulos
+  document.querySelectorAll(".lic-plantao-bloco").forEach((b,i)=>{
+    b.dataset.idx = i;
+    const span = b.querySelector("span");
+    if (span) span.textContent = "Plantão "+(i+1);
+    const btn = b.querySelector("button");
+    if (btn) btn.setAttribute("onclick",`licRemoverPlantao(${i})`);
+    if (i===0 && btn) btn.remove(); // primeiro não tem botão remover
+  });
+}
+
 function abrirModalLicenca() {
-  ["lic-nome","lic-hospital","lic-slot","lic-obs","lic-duracao","lic-retorno"].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=""; });
+  ["lic-nome","lic-obs","lic-duracao","lic-retorno"].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=""; });
   document.getElementById("lic-tipo").value="";
-  document.getElementById("lic-turno").value="";
   document.getElementById("lic-inicio").value="";
   document.getElementById("lic-retorno-hint").textContent="";
-  document.querySelectorAll("#lic-dias-check input").forEach(cb=>cb.checked=false);
+  // Reinicia bloco de plantões com 1 plantão vazio
+  document.getElementById("lic-plantoes-wrap").innerHTML = licPlantaoHTML(0);
   abrirModal("modal-lic");
 }
 
@@ -1655,36 +1689,47 @@ function licCalcFim() {
 }
 
 async function salvarLicenca() {
-  const nome  = document.getElementById("lic-nome").value.trim();
-  const tipo  = document.getElementById("lic-tipo").value;
-  const inicio= document.getElementById("lic-inicio").value;
+  const nome   = document.getElementById("lic-nome").value.trim();
+  const tipo   = document.getElementById("lic-tipo").value;
+  const inicio = document.getElementById("lic-inicio").value;
   if (!nome||!tipo||!inicio) { toast("Preencha Nome, Tipo e Data de início","erro"); return; }
 
-  const dias = [...document.querySelectorAll("#lic-dias-check input:checked")].map(cb=>cb.value);
   const retVal = document.getElementById("lic-retorno").value;
   const retFmt = retVal ? fmtDataISO(retVal) : "Em aberto";
-  const id = "LM"+Date.now().toString().slice(-6);
+  const duracao = document.getElementById("lic-duracao").value;
+  const obs     = document.getElementById("lic-obs").value.trim();
+  const baseId  = "LM"+Date.now().toString().slice(-6);
+  const sufixos = ["","B","C","D","E","F"];
 
-  const newLic = { id, nome, tipo,
-    inicio: fmtDataISO(inicio),
-    retorno: retFmt,
-    duracao: document.getElementById("lic-duracao").value,
-    hospital: document.getElementById("lic-hospital").value.trim(),
-    slot: document.getElementById("lic-slot").value.trim(),
-    dias, turno: document.getElementById("lic-turno").value,
-    obs: document.getElementById("lic-obs").value.trim(),
-    status:"Ativa"
-  };
+  // Lê todos os blocos de plantão
+  const blocos = document.querySelectorAll(".lic-plantao-bloco");
+  if (blocos.length === 0) { toast("Adicione pelo menos um plantão","erro"); return; }
 
-  licencas.push(newLic);
+  const novasLics = [];
+  blocos.forEach((bloco, i) => {
+    const hospital = bloco.querySelector(".lic-hospital").value.trim();
+    const slot     = bloco.querySelector(".lic-slot").value.trim();
+    const turno    = bloco.querySelector(".lic-turno").value;
+    const dias     = [...bloco.querySelectorAll(".lic-dias-check input:checked")].map(cb=>cb.value);
+    const id       = baseId + sufixos[i];
+    novasLics.push({ id, nome, tipo,
+      inicio: fmtDataISO(inicio), retorno: retFmt, duracao,
+      hospital, slot, dias, turno, obs, status:"Ativa" });
+  });
+
+  // Adiciona ao estado local e renderiza
+  licencas.push(...novasLics);
   fecharModal("modal-lic");
   renderTudo();
-  toast("✓ Licença de "+nome+" criada");
+  toast("✓ "+novasLics.length+" entrada(s) de licença criada(s) — "+nome);
 
-  try {
-    const r = await apiPost({action:"registrarLicenca",licenca:{...newLic,id}});
-    if (!r.ok) toast("⚠️ Erro ao salvar no GS — adicionada localmente","alerta");
-  } catch(e) { toast("⚠️ Erro de conexão","erro"); }
+  // Salva cada entrada no GS
+  for (const lic of novasLics) {
+    try {
+      const r = await apiPost({action:"registrarLicenca", licenca: lic});
+      if (!r.ok) toast("⚠️ Erro ao salvar "+lic.id+" no GS","alerta");
+    } catch(e) { toast("⚠️ Erro de conexão — "+lic.id,"erro"); }
+  }
 }
 
 // ── Modal nova vaga
