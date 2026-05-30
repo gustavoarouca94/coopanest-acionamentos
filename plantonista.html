@@ -1165,6 +1165,9 @@ async function lerArquivoBase64(file) {
   });
 }
 
+// Limite: 4MB em base64 (~3MB de arquivo) — Apps Script rejeita payloads maiores silenciosamente
+const MAX_ARQUIVO_BYTES = 3 * 1024 * 1024; // 3MB
+
 // ── ENVIO AO APPS SCRIPT
 async function postar(payload) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("COLE_AQUI")) return;
@@ -1547,13 +1550,29 @@ async function enviarAcionamento() {
       })) : [],
     };
 
-    // Anexa atestado se houver
-    if (campo("a-foto").files.length > 0) {
-      const file = campo("a-foto").files[0];
-      dados.base64Arquivo = await lerArquivoBase64(file);
-      dados.tipoArquivo   = file.type;
-      dados.nomeArquivo   = file.name;
+    // Anexa atestado se houver — valida tamanho antes de converter
+    const fotoFiles = campo("a-foto").files;
+    if (fotoFiles.length > 0) {
+      const file = fotoFiles[0];
+      if (file.size > MAX_ARQUIVO_BYTES) {
+        // Arquivo grande: registra acionamento SEM o arquivo
+        // e instrui o plantonista a enviar separadamente
+        dados.temAtestado = false;
+        toast("⚠️ Arquivo maior que 3MB — registrando sem anexo. Use a tela de Envio de Atestado.", "alerta");
+      } else {
+        dados.base64Arquivo = await lerArquivoBase64(file);
+        dados.tipoArquivo   = file.type;
+        dados.nomeArquivo   = file.name;
+      }
     }
+
+    // Remove plantoesAdicionais do payload principal se vazio (reduz tamanho)
+    if (!dados.plantoesAdicionais || !dados.plantoesAdicionais.length) {
+      delete dados.plantoesAdicionais;
+    }
+    // Remove campos opcionais vazios para reduzir payload
+    if (!dados.diasAfastamento) delete dados.diasAfastamento;
+    if (!dados.dataFimAfastamento) delete dados.dataFimAfastamento;
 
     await postar(dados);
 
@@ -1590,7 +1609,7 @@ async function enviarAcionamento() {
       titulo:    "Acionamento registrado!",
       subtitulo: extras.length > 0
         ? `${1 + extras.length} plantões registrados — comprovante único`
-        : "O coordenador e a comissão foram notificados.",
+        : "📲 Tire um print deste comprovante e envie pelo WhatsApp ao coordenador do turno.",
       protocolo,
       linhas: [
         ["Plantonista", dados.nome + (dados.crm ? ` — CRM-${dados.crmUf} ${dados.crm}` : "")],
@@ -1883,7 +1902,7 @@ async function enviarAvisoPrevio() {
 
     mostrarComprovante({
       titulo:    "Aviso prévio registrado!",
-      subtitulo: "O NAC e a Comissão de Plantões foram notificados.",
+      subtitulo: "📲 Tire um print deste comprovante e envie pelo WhatsApp a um membro da Comissão de Plantões.",
       protocolo,
       linhas: [
         ["Plantonista",  dados.nome],
