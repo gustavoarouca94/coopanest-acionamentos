@@ -270,6 +270,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Plantonista</th>
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Plantão</th>
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Motivo</th>
+          <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Dias afast.</th>
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Atestado</th>
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Reposição</th>
           <th style="padding:11px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Ações</th>
@@ -289,7 +290,6 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
       <button class="filtro-btn ativo" onclick="setFiltroLic('todos',this)">Ativas</button>
       <button class="filtro-btn" onclick="setFiltroLic('lm',this)">LM</button>
       <button class="filtro-btn" onclick="setFiltroLic('gestacional',this)">Gestacional</button>
-      <button class="filtro-btn" onclick="setFiltroLic('disciplinar',this)">Disciplinar</button>
       <button class="filtro-btn" onclick="setFiltroLic('saude',this)">Saúde</button>
       <button class="filtro-btn" onclick="setFiltroLic('encerradas',this)">Encerradas</button>
     </div>
@@ -310,6 +310,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
       <button class="filtro-btn" onclick="setFiltroAv('encerrado',this)">Encerrados</button>
       <input class="busca-input" placeholder="Buscar…" oninput="renderAv()">
     </div>
+    <button class="btn btn-verde btn-sm" onclick="abrirModalAviso()">+ Novo aviso prévio</button>
   </div>
   <div id="lista-av"></div>
 </div>
@@ -324,6 +325,8 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
       <button class="filtro-btn" onclick="setFiltroVg('preenchida',this)">Preenchidas</button>
       <button class="filtro-btn" onclick="setFiltroVg('reserva',this)">Reserva</button>
     </div>
+    <button class="btn btn-outline btn-sm" onclick="abrirModalColarVagas()">📋 Colar lista</button>
+    <button class="btn btn-outline btn-sm" onclick="abrirLivroVoluntarios()">👥 Voluntários</button>
     <button class="btn btn-verde btn-sm" onclick="abrirModalVaga()">+ Nova vaga</button>
   </div>
   <div class="stats-bar">
@@ -359,6 +362,14 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
     <button class="btn btn-roxo btn-sm" onclick="abrirModalRepManual()">+ Reposição avulsa</button>
   </div>
   <div id="escala-reps-lista" style="margin-bottom:12px"></div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;padding:10px 14px;background:var(--cinza-0);border-radius:8px;font-size:11px">
+    <span style="font-weight:700;color:var(--cinza-4)">Legenda:</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--amarelo);vertical-align:middle"></span> LM</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--info);vertical-align:middle"></span> Gestacional</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--verde-d);vertical-align:middle"></span> Vaga em aberto</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--roxo);vertical-align:middle"></span> Quinzenal</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#be185d;vertical-align:middle"></span> Acionamento pontual</span>
+  </div>
   <div id="escala-grid" class="escala-grid"></div>
 </div>
 
@@ -441,14 +452,14 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
           <label>Tipo de afastamento *</label>
           <select id="lic-tipo" onchange="licTipoChange()">
             <option value="">Selecione…</option>
-            <option value="lm">Licença-maternidade (120d)</option>
-            <option value="gestacional">Afastamento gestacional</option>
-            <option value="disciplinar">Afastamento disciplinar</option>
+            <option value="lm">Licença-maternidade (120d — todos os plantões, início no parto)</option>
+            <option value="gestacional">Afastamento gestacional (só noturnos, a partir da 32ª sem.)</option>
             <option value="saude">Afastamento por saúde</option>
             <option value="curso">Afastamento por curso / científico</option>
             <option value="outro">Outro</option>
           </select>
           <div class="msg-erro">Obrigatório.</div>
+          <div id="lic-tipo-hint" style="font-size:11px;color:var(--cinza-4);margin-top:4px"></div>
         </div>
       </div>
       <div class="dois-col">
@@ -615,6 +626,112 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
   </div>
 </div>
 
+<!-- Modal: Livro de Voluntários -->
+<div class="modal-overlay" id="modal-livro-vol" onclick="fecharModalFora(event,'modal-livro-vol')">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-hdr">
+      <h3>👥 Livro de Voluntários — Mercado de Trabalho</h3>
+      <button class="btn-fechar" onclick="fecharModal('modal-livro-vol')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="livro-vol-conteudo"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-livro-vol')">Fechar</button>
+      <button class="btn btn-verde" onclick="exportarLivroVoluntariosPDF()">📄 Gerar relatório PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novo Aviso Prévio manual -->
+<div class="modal-overlay" id="modal-aviso" onclick="fecharModalFora(event,'modal-aviso')">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3>+ Novo Aviso Prévio (cadastro manual)</h3>
+      <button class="btn-fechar" onclick="fecharModal('modal-aviso')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="campo">
+        <label>Nome do cooperado *</label>
+        <input type="text" id="av-nome" placeholder="Quem está saindo">
+      </div>
+      <div class="dois-col">
+        <div class="campo">
+          <label>Hospital / unidade *</label>
+          <input type="text" id="av-hospital" placeholder="Ex: HR, HAM…">
+        </div>
+        <div class="campo">
+          <label>Data de início do AP *</label>
+          <input type="date" id="av-inicio">
+        </div>
+      </div>
+      <div class="dois-col">
+        <div class="campo">
+          <label>Plantão / slot</label>
+          <input type="text" id="av-slot" placeholder="Ex: Seg diurno 12h">
+        </div>
+        <div class="campo">
+          <label>Turno</label>
+          <select id="av-turno">
+            <option value="">Selecione…</option>
+            <option>Diurno (07h–19h)</option>
+            <option>Noturno (19h–07h)</option>
+            <option>Manhã (07h–13h)</option>
+            <option>Tarde (13h–19h)</option>
+          </select>
+        </div>
+      </div>
+      <div class="campo">
+        <label>Dias da semana</label>
+        <div class="dias-check" id="av-dias-check">
+          <label><input type="checkbox" value="Seg"><span>Seg</span></label>
+          <label><input type="checkbox" value="Ter"><span>Ter</span></label>
+          <label><input type="checkbox" value="Qua"><span>Qua</span></label>
+          <label><input type="checkbox" value="Qui"><span>Qui</span></label>
+          <label><input type="checkbox" value="Sex"><span>Sex</span></label>
+          <label><input type="checkbox" value="Sáb"><span>Sáb</span></label>
+          <label><input type="checkbox" value="Dom"><span>Dom</span></label>
+        </div>
+      </div>
+      <div class="campo">
+        <label>Prazo do aviso prévio (dias)</label>
+        <input type="number" id="av-prazo" value="30" min="1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-aviso')">Cancelar</button>
+      <button class="btn btn-verde" onclick="salvarAvisoManual()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Colar lista de vagas -->
+<div class="modal-overlay" id="modal-colar-vagas" onclick="fecharModalFora(event,'modal-colar-vagas')">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-hdr">
+      <h3>📋 Colar lista de vagas da semana</h3>
+      <button class="btn-fechar" onclick="fecharModal('modal-colar-vagas')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="aviso-box aviso-info" style="margin-bottom:14px">
+        Cole a lista do documento Word. Uma vaga por linha. Formatos aceitos:<br>
+        <code style="font-size:11px">Hospital · Slot · Dias · Turno</code> &nbsp;ou&nbsp; <code style="font-size:11px">Hospital - Slot - Dia - Turno</code><br>
+        <span style="font-size:11px;color:var(--cinza-4)">Separadores aceitos: · | ; tab ou hífen. Linhas em branco são ignoradas.</span>
+      </div>
+      <div class="campo">
+        <label>Lista de vagas</label>
+        <textarea id="colar-vagas-txt" rows="10" placeholder="HR — Imagem · TC Tarde 13-19h · Seg · 6h Tarde (13h–19h)&#10;Hospital do Idoso · Manhã 7-13h · Qua · 6h Manhã (7h–13h)&#10;..."></textarea>
+      </div>
+      <div id="colar-vagas-preview" style="font-size:12px;color:var(--cinza-4)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-colar-vagas')">Cancelar</button>
+      <button class="btn btn-info" onclick="previewColarVagas()">👁 Pré-visualizar</button>
+      <button class="btn btn-verde" onclick="importarColarVagas()">Importar vagas</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toast-wrap" id="toast-wrap"></div>
 
@@ -631,6 +748,7 @@ let acionamentos = [];
 let licencas     = [];
 let vagas        = [];
 let avisos       = [];
+let livroVoluntarios = [];  // {nome, vaga, hospital, turno, data, origem}
 let reposManual  = []; // reposições avulsas adicionadas pela Comissão
 
 let filtroAc   = "todos";
@@ -692,6 +810,7 @@ function normAcionamento(a) {
     statusAtestado: normStr(a.statusAtestado || a.status_atestado || ""),
     statusRep,
     obs:            normStr(a.obs || ""),
+    diasAfastamento: normStr(a.diasAfastamento || a.dias_afastamento || ""),
     prazoAtt:       normStr(a.prazoAtt || a.prazo_att || a.prazo48h || a.prazo24h || ""),
     linkAtestado:   normStr(a.linkAtestado || a.link_atestado || ""),
     categoria:      normStr(a.categoria || ""),
@@ -798,6 +917,11 @@ function fmtDataISO(isoStr) {
   if (!isoStr) return "—";
   const p = isoStr.split("-"); if (p.length<3) return isoStr;
   return p[2]+"/"+p[1]+"/"+p[0];
+}
+
+function hojeBR() {
+  const d = new Date(); const p = x=>String(x).padStart(2,"0");
+  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear();
 }
 
 // ════════════════════════════════════════════════════════
@@ -961,14 +1085,18 @@ function cardAcionamento(a) {
   }
 
   const btns = [];
-  if (isPendAtestado(a)||isVencido(a)) btns.push(`<button class="btn btn-outline btn-sm" onclick="acaoConfirmarAtestado('${a.protocolo}')">✓ Confirmar documento</button>`);
-  if (a.exigeRep&&a.statusRep==="Pendente") {
-    if (!a.dataRep || a.dataRep==="—") btns.push(`<button class="btn btn-info btn-sm" onclick="abrirModalRep('${a.protocolo}')">📅 Definir data de reposição</button>`);
-    else btns.push(`<button class="btn btn-info btn-sm" onclick="abrirModalRep('${a.protocolo}')">📅 Editar reposição</button>`);
-    btns.push(`<button class="btn btn-verde btn-sm" onclick="acaoConfirmarReposicao('${a.protocolo}')">✓ Marcar cumprida</button>`);
-    btns.push(`<button class="btn btn-erro btn-sm" onclick="acaoRepNaoCumprida('${a.protocolo}')">✕ Não cumprida</button>`);
+  if (isPendAtestado(a)||isVencido(a)) {
+    btns.push(`<button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="acaoConfirmarAtestado(this.dataset.prot)">✓ Confirmar documento</button>`);
+    btns.push(`<button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="acaoDispensarAtestado(this.dataset.prot)">⊘ Dispensar</button>`);
+    btns.push(`<button class="btn btn-erro btn-sm" data-prot="${a.protocolo}" onclick="acaoEscalarDoc(this.dataset.prot)">📧 Escalar à comissão</button>`);
   }
-  btns.push(`<button class="btn btn-outline btn-sm" onclick="abrirDetalhe('${a.protocolo}')">Detalhes</button>`);
+  if (a.exigeRep&&a.statusRep==="Pendente") {
+    if (!a.dataRep || a.dataRep==="—") btns.push(`<button class="btn btn-info btn-sm" data-prot="${a.protocolo}" onclick="abrirModalRep(this.dataset.prot)">📅 Definir data de reposição</button>`);
+    else btns.push(`<button class="btn btn-info btn-sm" data-prot="${a.protocolo}" onclick="abrirModalRep(this.dataset.prot)">📅 Editar reposição</button>`);
+    btns.push(`<button class="btn btn-verde btn-sm" data-prot="${a.protocolo}" onclick="acaoConfirmarReposicao(this.dataset.prot)">✓ Marcar cumprida</button>`);
+    btns.push(`<button class="btn btn-erro btn-sm" data-prot="${a.protocolo}" onclick="acaoRepNaoCumprida(this.dataset.prot)">✕ Não cumprida</button>`);
+  }
+  btns.push(`<button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="abrirDetalhe(this.dataset.prot)">Detalhes</button>`);
 
   const repInfo = a.exigeRep ? `
     <div class="info-item"><div class="il">Reposição</div><div class="iv">${pillStatus(a.statusRep)}</div></div>
@@ -1020,7 +1148,7 @@ function renderHist() {
 
   const tb = document.getElementById("hist-tbody");
   if (!itens.length) {
-    tb.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--cinza-3)">Nenhum registro.</td></tr>`;
+    tb.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--cinza-3)">Nenhum registro.</td></tr>`;
     return;
   }
   tb.innerHTML = itens.map((a,i)=>`<tr style="border-bottom:1px solid var(--cinza-1);background:${a.isPlantaoExtra?'var(--amarelo-bg)':i%2===0?'#fff':'var(--cinza-0)'}">
@@ -1031,13 +1159,18 @@ function renderHist() {
     <td style="padding:9px 14px;font-weight:600">${a.nome}</td>
     <td style="padding:9px 14px;font-size:12px">${a.dataPlantao||"—"}<br><span style="color:var(--cinza-3)">${a.turno||""}</span></td>
     <td style="padding:9px 14px;font-size:12px">${a.motivo||"—"}</td>
+    <td style="padding:9px 14px;font-size:12px;text-align:center">
+      <span style="cursor:pointer" data-prot="${a.protocolo}" onclick="acaoEditarDiasAfast(this.dataset.prot)" title="Clique para editar">
+        ${a.diasAfastamento ? `<strong>${a.diasAfastamento}</strong> dia(s)` : `<span style="color:var(--cinza-3)">—</span>`} ✏️
+      </span>
+    </td>
     <td style="padding:9px 14px">${pillAtestado(a.statusAtestado)}</td>
     <td style="padding:9px 14px">${a.exigeRep?pillStatus(a.statusRep):mkTag("N/A","cinza")}</td>
     <td style="padding:9px 14px">
       <div style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" onclick="abrirDetalhe('${a.protocolo}')">Ver</button>
-        ${a.exigeRep&&a.statusRep!=="Cumprida"?`<button class="btn btn-info btn-sm" onclick="abrirModalRep('${a.protocolo}')">📅</button>`:""}
-        ${isPendAtestado(a)?`<button class="btn btn-verde btn-sm" onclick="acaoConfirmarAtestado('${a.protocolo}')">✓</button>`:""}
+        <button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="abrirDetalhe(this.dataset.prot)">Ver</button>
+        ${a.exigeRep&&a.statusRep!=="Cumprida"?`<button class="btn btn-info btn-sm" data-prot="${a.protocolo}" onclick="abrirModalRep(this.dataset.prot)">📅</button>`:""}
+        ${isPendAtestado(a)?`<button class="btn btn-verde btn-sm" data-prot="${a.protocolo}" onclick="acaoConfirmarAtestado(this.dataset.prot)">✓</button>`:""}
       </div>
     </td>
   </tr>`).join("");
@@ -1095,7 +1228,7 @@ function renderLic() {
     const isAtiva = l.status==="Ativa";
     const btns = [];
     if (isAtiva) {
-      if (l.tipo==="gestacional") btns.push(`<button class="btn btn-amarelo btn-sm" onclick="acaoConverterLM('${l.id}')">🍼 Parto — iniciar LM 120d</button>`);
+      if (l.tipo==="gestacional") btns.push(`<button class="btn btn-amarelo btn-sm" data-id="${l.id}" onclick="acaoConverterLM(this.dataset.id)">🍼 Parto — iniciar LM 120d</button>`);
       btns.push(`<button class="btn btn-verde btn-sm" data-id="${l.id}" data-nome="${l.nome}" onclick="acaoEncerrarLicenca(this.dataset.id,this.dataset.nome)">✓ Encerrar — retornou</button>`);
       btns.push(`<button class="btn btn-info btn-sm" data-id="${l.id}" data-nome="${l.nome}" onclick="abrirModalRetorno(this.dataset.id,this.dataset.nome)">📅 Definir/editar retorno</button>`);
     }
@@ -1363,6 +1496,18 @@ function renderEscala() {
     });
   });
 
+  // ── FONTE 4: Acionamentos pontuais (plantão coberto pelo reserva), inclui plantões extras
+  const entAcion = [];
+  acionamentos.filter(a=>a.dataPlantao && a.dataPlantao!=="—").forEach(a=>{
+    const dia = diaSemana(a.dataPlantao);
+    if (!dia) return;
+    entAcion.push({
+      dia, turnoK:tn(a.turno),
+      nome:a.nome, hospital:a.hospital, slot:(a.isPlantaoExtra?"↳ Plantão extra":"Acionamento")+(a.motivo?" · "+a.motivo:""),
+      tipo:"acionamento", data:a.dataPlantao, protocolo:a.protocolo, isExtra:a.isPlantaoExtra,
+    });
+  });
+
   // ── Render lista de reposições avulsas
   const repEl = document.getElementById("escala-reps-lista");
   const repsAvulsas = reposManual;
@@ -1390,8 +1535,8 @@ function renderEscala() {
     const eHoje = semanaOffset===0 && dia===hoje;
 
     const reps   = reposicoes.filter(r=>r.dia===dia);
-    const fixosD = [...entLicencas,...entVagas].filter(e=>e.dia===dia&&e.turnoK==="D");
-    const fixosN = [...entLicencas,...entVagas].filter(e=>e.dia===dia&&e.turnoK==="N");
+    const fixosD = [...entLicencas,...entVagas,...entAcion].filter(e=>e.dia===dia&&e.turnoK==="D");
+    const fixosN = [...entLicencas,...entVagas,...entAcion].filter(e=>e.dia===dia&&e.turnoK==="N");
     const repsD  = reps.filter(r=>r.turnoK==="D");
     const repsN  = reps.filter(r=>r.turnoK==="N");
 
@@ -1442,8 +1587,9 @@ function renderVagaEscala(e) {
     saude:    "background:var(--cinza-1);color:var(--cinza-4)",
     vago:     "background:var(--verde-l);color:var(--verde-d)",
     vago_quinzenal:"background:var(--roxo-bg);color:var(--roxo)",
+    acionamento:"background:#fce7f3;color:#be185d",
   }[e.tipo]||"background:var(--cinza-1);color:var(--cinza-4)";
-  const LBL = {lm:"LM",gestacional:"Gest.",disciplinar:"Disc.",saude:"Saúde",vago:"Vago",vago_quinzenal:"Quinz."}[e.tipo]||e.tipo;
+  const LBL = {lm:"LM",gestacional:"Gest.",disciplinar:"Disc.",saude:"Saúde",vago:"Vago",vago_quinzenal:"Quinz.",acionamento:e.isExtra?"Extra":"Acion."}[e.tipo]||e.tipo;
   const nome = e.nome==="Vaga em aberto"?`<span style="color:var(--cinza-3);font-style:italic">Vaga em aberto</span>`:e.nome;
   return `<div class="escala-vaga">
     <span class="escala-vaga-tipo" style="${COR}">${LBL}</span>
@@ -1672,7 +1818,16 @@ function abrirModalLicenca() {
 
 function licTipoChange() {
   const tipo = document.getElementById("lic-tipo").value;
-  if (tipo==="lm") document.getElementById("lic-duracao").value="120";
+  const hint = document.getElementById("lic-tipo-hint");
+  if (tipo==="lm") {
+    document.getElementById("lic-duracao").value="120";
+    if (hint) hint.innerHTML = "🍼 <strong>LM:</strong> afasta de TODOS os plantões, 120 dias a partir do parto. Início = data do parto.";
+  } else if (tipo==="gestacional") {
+    document.getElementById("lic-duracao").value="";
+    if (hint) hint.innerHTML = "🤰 <strong>Gestacional:</strong> afasta apenas dos plantões NOTURNOS, a partir da 32ª semana. Retorno em aberto (até o parto → converte em LM).";
+  } else {
+    if (hint) hint.innerHTML = "";
+  }
   licCalcFim();
 }
 
@@ -1808,6 +1963,68 @@ function removerRepManual(id) {
 // AÇÕES — UI otimista com rollback
 // ════════════════════════════════════════════════════════
 
+async function acaoConfirmarReposicao(protocolo) {
+  const a = acionamentos.find(x=>x.protocolo===protocolo);
+  if (!a || !confirm("Confirmar reposição cumprida por "+a.nome+"?\nData: "+(a.dataRep||"—")+" · "+(a.turnoRep||"—"))) return;
+  // Correção do delay: atualiza estado, remove flag de pendência e re-renderiza imediatamente
+  a.statusRep = "Cumprida";
+  a.exigeRep  = true;
+  renderTudo(); toast("✓ Reposição cumprida — "+a.nome);
+  try {
+    const r = await apiPost({action:"confirmarReposicao",protocolo});
+    if (!r.ok) { toast("⚠️ Erro ao salvar","erro"); }
+  } catch(e) { toast("⚠️ Erro de conexão","erro"); }
+}
+
+async function acaoRepNaoCumprida(protocolo) {
+  const a = acionamentos.find(x=>x.protocolo===protocolo);
+  if (!a) return;
+  const motivo = prompt("Motivo do não cumprimento da reposição por "+a.nome+" (opcional):");
+  if (motivo===null) return;
+  const status = "Não cumprida"+(motivo?" — "+motivo:"");
+  a.statusRep = status;
+  renderTudo(); toast("⚠️ Reposição não cumprida — email enviado à comissão");
+  try {
+    await apiPost({action:"marcarRepNaoCumprida", protocolo, motivo, nome:a.nome,
+      hospital:a.hospital, dataPlantao:a.dataPlantao, dataRep:a.dataRep, turnoRep:a.turnoRep, notificar:true});
+  } catch(e) { toast("⚠️ Erro de conexão","erro"); }
+}
+
+async function acaoEditarDiasAfast(protocolo) {
+  const a = acionamentos.find(x=>x.protocolo===protocolo);
+  if (!a) return;
+  const novo = prompt("Dias de afastamento para "+a.nome+" ("+protocolo+"):", a.diasAfastamento||"");
+  if (novo===null) return;
+  const dias = novo.trim();
+  a.diasAfastamento = dias;
+  renderTudo(); toast("✏️ Dias de afastamento atualizados — "+a.nome);
+  try { await apiPost({action:"atualizarDiasAfast", protocolo, dias}); }
+  catch(e) { toast("⚠️ Erro ao salvar","erro"); }
+}
+
+async function acaoDispensarAtestado(protocolo) {
+  const a = acionamentos.find(x=>x.protocolo===protocolo);
+  if (!a) return;
+  const motivo = prompt("Motivo da dispensa do atestado de "+a.nome+" (opcional):");
+  if (motivo===null) return;
+  a.statusAtestado = "Dispensado"+(motivo?" — "+motivo:"");
+  renderTudo(); toast("⊘ Atestado dispensado — "+a.nome);
+  try { await apiPost({action:"dispensarAtestado", protocolo, motivo}); }
+  catch(e) { toast("⚠️ Erro ao salvar","erro"); }
+}
+
+async function acaoEscalarDoc(protocolo) {
+  const a = acionamentos.find(x=>x.protocolo===protocolo);
+  if (!a || !confirm("Escalar documento não enviado de "+a.nome+" para o email da Comissão de Plantões?")) return;
+  toast("📧 Escalando à comissão…");
+  try {
+    const r = await apiPost({action:"escalarDocComissao", protocolo, nome:a.nome,
+      email:a.email, hospital:a.hospital, dataPlantao:a.dataPlantao, motivo:a.motivo});
+    if (r.ok) toast("📧 Documento escalado à comissão — "+a.nome);
+    else toast("⚠️ Erro ao escalar","erro");
+  } catch(e) { toast("⚠️ Erro de conexão","erro"); }
+}
+
 async function acaoConfirmarAtestado(protocolo) {
   const a = acionamentos.find(x=>x.protocolo===protocolo);
   if (!a || !confirm("Confirmar recebimento do documento de "+a.nome+"?")) return;
@@ -1818,29 +2035,6 @@ async function acaoConfirmarAtestado(protocolo) {
     const r = await apiPost({action:"confirmarAtestado",protocolo});
     if (!r.ok) { toast("⚠️ Erro ao salvar","erro"); a.statusAtestado=prev; renderTudo(); }
   } catch(e) { toast("⚠️ Erro de conexão","erro"); }
-}
-
-async function acaoConfirmarReposicao(protocolo) {
-  const a = acionamentos.find(x=>x.protocolo===protocolo);
-  if (!a || !confirm("Confirmar reposição cumprida por "+a.nome+"?\nData: "+(a.dataRep||"—")+" · "+(a.turnoRep||"—"))) return;
-  const prev = a.statusRep;
-  a.statusRep = "Cumprida";
-  renderTudo(); toast("✓ Reposição marcada como cumprida — "+a.nome);
-  try {
-    const r = await apiPost({action:"confirmarReposicao",protocolo});
-    if (!r.ok) { toast("⚠️ Erro ao salvar","erro"); a.statusRep=prev; renderTudo(); }
-  } catch(e) { toast("⚠️ Erro de conexão","erro"); }
-}
-
-async function acaoRepNaoCumprida(protocolo) {
-  const a = acionamentos.find(x=>x.protocolo===protocolo);
-  if (!a) return;
-  const motivo = prompt("Motivo do não cumprimento (opcional):");
-  if (motivo===null) return;
-  const status = "Não cumprida"+(motivo?" — "+motivo:"");
-  a.statusRep = status;
-  renderTudo(); toast("⚠️ Reposição marcada como não cumprida");
-  try { await apiPost({action:"marcarRepNaoCumprida",protocolo,motivo}); } catch(e) {}
 }
 
 async function acaoDefinirRetorno(id) {
@@ -1877,6 +2071,11 @@ async function acaoConverterLM(id) {
 async function acaoEncerrarAviso(protocolo, nome) {
   const voluntario = prompt("Nome do voluntário que assumiu a vaga\n(deixe em branco se não souber):");
   if (voluntario===null) return;
+  const ap = avisos.find(a=>a.protocolo===protocolo);
+  if (voluntario.trim() && ap) {
+    livroVoluntarios.push({ nome:voluntario.trim(), vaga:ap.hospital+(ap.turno?" · "+ap.turno:""),
+      hospital:ap.hospital, turno:ap.turno||"", data:hojeBR(), origem:"Aviso prévio ("+nome+")" });
+  }
   avisos = avisos.map(a=>a.protocolo===protocolo?{...a,status:"Encerrado — voluntário assumiu"}:a);
   renderTudo(); toast("✓ Aviso prévio encerrado — "+nome);
   try { await apiPost({action:"encerrarAvisoPrevio",protocolo,novoVoluntario:voluntario.trim()}); }
@@ -1896,6 +2095,8 @@ async function acaoPreencherVaga(id) {
   if (!v) return;
   const nome = prompt("Nome do voluntário que assumiu a vaga:\n"+v.hospital+" — "+v.slot);
   if (!nome||!nome.trim()) return;
+  livroVoluntarios.push({ nome:nome.trim(), vaga:v.hospital+" · "+v.slot,
+    hospital:v.hospital, turno:v.turno||"", data:hojeBR(), origem:"Vaga em aberto" });
   vagas = vagas.map(x=>x.id===id?{...x,status:"Preenchida",voluntario:nome.trim()}:x);
   renderTudo(); toast("✓ Vaga preenchida por "+nome.trim());
   try {
@@ -1910,6 +2111,185 @@ async function acaoVagaReserva(id) {
   renderTudo(); toast("⚡ Vaga transferida para reserva");
   try { await apiPost({action:"vagaReserva",id}); }
   catch(e) { toast("⚠️ Erro ao salvar","erro"); }
+}
+
+// ── AVISO PRÉVIO MANUAL
+function abrirModalAviso() {
+  ["av-nome","av-hospital","av-inicio","av-slot"].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=""; });
+  document.getElementById("av-turno").value="";
+  document.getElementById("av-prazo").value="30";
+  document.querySelectorAll("#av-dias-check input").forEach(cb=>cb.checked=false);
+  abrirModal("modal-aviso");
+}
+
+async function salvarAvisoManual() {
+  const nome     = document.getElementById("av-nome").value.trim();
+  const hospital = document.getElementById("av-hospital").value.trim();
+  const inicio   = document.getElementById("av-inicio").value;
+  if (!nome||!hospital||!inicio) { toast("Preencha Nome, Hospital e Data de início","erro"); return; }
+  const slot  = document.getElementById("av-slot").value.trim();
+  const turno = document.getElementById("av-turno").value;
+  const dias  = [...document.querySelectorAll("#av-dias-check input:checked")].map(cb=>cb.value);
+  const prazo = parseInt(document.getElementById("av-prazo").value)||30;
+
+  const protocolo = "AP-"+Date.now().toString().slice(-8);
+  // Calcula vencimento = início + prazo
+  const dInicio = new Date(inicio+"T12:00:00");
+  const dVenc = new Date(dInicio); dVenc.setDate(dVenc.getDate()+prazo);
+  const p = x=>String(x).padStart(2,"0");
+  const vencBR = p(dVenc.getDate())+"/"+p(dVenc.getMonth()+1)+"/"+dVenc.getFullYear();
+  const vencISO = dVenc.getFullYear()+"-"+p(dVenc.getMonth()+1)+"-"+p(dVenc.getDate());
+
+  const novoAviso = {
+    protocolo, nome, hospital, turno, slot,
+    diasSemana: dias, frequencia:"", prazoDias:prazo,
+    dataInicio: fmtDataISO(inicio), dataVencimento: vencBR, dataVencISO: vencISO,
+    status:"Ativo", crm:"", motivoSaida:"", obs:"Cadastro manual"
+  };
+
+  avisos.push(normAviso(novoAviso));
+  fecharModal("modal-aviso");
+  renderTudo();
+  toast("✓ Aviso prévio registrado — "+nome);
+
+  try {
+    await apiPost({action:"registrarAvisoPrevioManual", aviso:novoAviso,
+      nome, hospital, turno, slot, dias:dias.join(","), inicio:fmtDataISO(inicio),
+      dataVencimento:vencBR, dataVencISO:vencISO, prazoDias:prazo});
+  } catch(e) { toast("⚠️ Erro ao salvar no GS","alerta"); }
+}
+
+// ── COLAR LISTA DE VAGAS (import em massa)
+function abrirModalColarVagas() {
+  document.getElementById("colar-vagas-txt").value = "";
+  document.getElementById("colar-vagas-preview").innerHTML = "";
+  abrirModal("modal-colar-vagas");
+}
+
+function parseVagasTexto(txt) {
+  const linhas = txt.split("\n").map(l=>l.trim()).filter(l=>l.length>2);
+  const DIAS = {seg:"Seg",ter:"Ter",qua:"Qua",qui:"Qui",sex:"Sex","sáb":"Sáb",sab:"Sáb",dom:"Dom"};
+  const vagasParsed = [];
+  linhas.forEach((linha,idx)=>{
+    // Detecta separador: · | ; tab ou hífen entre espaços
+    let partes = linha.split(/\s*[·|;\t]\s*|\s+-\s+/).map(p=>p.trim()).filter(Boolean);
+    if (partes.length < 2) return;
+    const hospital = partes[0];
+    const slot     = partes[1] || "";
+    // Procura dias e turno nas partes restantes
+    let dias = [], turno = "";
+    partes.slice(2).forEach(p=>{
+      const pl = p.toLowerCase();
+      // Verifica se é dia da semana
+      const diaMatch = Object.keys(DIAS).find(d=>pl.includes(d));
+      if (diaMatch && p.length<=8) { dias.push(DIAS[diaMatch]); }
+      else if (/\d|manhã|tarde|noturno|diurno|noite/i.test(p)) { turno = p; }
+      else if (!turno) { turno = p; }
+    });
+    // Se não achou dias nas partes >2, tenta na parte do slot
+    if (!dias.length) {
+      Object.keys(DIAS).forEach(d=>{ if (slot.toLowerCase().includes(d)) dias.push(DIAS[d]); });
+    }
+    vagasParsed.push({
+      id: "VGX"+Date.now().toString().slice(-6)+idx,
+      hospital, slot, dias, turno: turno||"6h", tipo:"vago", status:"Aberta", voluntario:"", obs:"Importada"
+    });
+  });
+  return vagasParsed;
+}
+
+function previewColarVagas() {
+  const txt = document.getElementById("colar-vagas-txt").value;
+  const parsed = parseVagasTexto(txt);
+  const box = document.getElementById("colar-vagas-preview");
+  if (!parsed.length) { box.innerHTML = `<div style="color:var(--erro);padding:8px">Nenhuma vaga reconhecida. Verifique o formato.</div>`; return; }
+  box.innerHTML = `<div style="margin-top:10px;padding:10px;background:var(--cinza-0);border-radius:8px">
+    <strong>${parsed.length} vaga(s) reconhecida(s):</strong>
+    ${parsed.map(v=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--cinza-1)">
+      📍 <strong>${v.hospital}</strong> · ${v.slot} · ${v.dias.join(", ")||"—"} · ${v.turno}</div>`).join("")}
+  </div>`;
+}
+
+async function importarColarVagas() {
+  const txt = document.getElementById("colar-vagas-txt").value;
+  const parsed = parseVagasTexto(txt);
+  if (!parsed.length) { toast("Nenhuma vaga reconhecida","erro"); return; }
+  if (!confirm("Importar "+parsed.length+" vaga(s)? Elas serão adicionadas às vagas em aberto.")) return;
+
+  vagas.push(...parsed.map(normVaga));
+  fecharModal("modal-colar-vagas");
+  renderTudo();
+  toast("✓ "+parsed.length+" vaga(s) importada(s)");
+
+  // Salva cada uma no GS
+  for (const v of parsed) {
+    try { await apiPost({action:"criarVaga", vaga:v}); }
+    catch(e) { /* continua mesmo se uma falhar */ }
+  }
+}
+
+// ── LIVRO DE VOLUNTÁRIOS (mercado de trabalho)
+function abrirLivroVoluntarios() {
+  const box = document.getElementById("livro-vol-conteudo");
+  if (!livroVoluntarios.length) {
+    box.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-3)">Nenhum voluntário registrado ainda.<br><span style="font-size:12px">Os nomes aparecem aqui ao preencher vagas ou encerrar avisos prévios.</span></div>`;
+  } else {
+    // Agrupa por voluntário para contagem
+    const cont = {};
+    livroVoluntarios.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
+    const ranking = Object.entries(cont).sort((a,b)=>b[1]-a[1]);
+
+    box.innerHTML = `
+      <div style="margin-bottom:14px;padding:12px;background:var(--cinza-0);border-radius:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--verde);margin-bottom:6px">RANKING — plantões assumidos</div>
+        ${ranking.map(([nome,n])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${nome}</span><strong>${n} vaga(s)</strong></div>`).join("")}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="border-bottom:2px solid var(--cinza-1);text-align:left">
+          <th style="padding:6px">Data</th><th style="padding:6px">Voluntário</th><th style="padding:6px">Vaga assumida</th><th style="padding:6px">Origem</th>
+        </tr></thead>
+        <tbody>
+        ${livroVoluntarios.slice().reverse().map(v=>`<tr style="border-bottom:1px solid var(--cinza-1)">
+          <td style="padding:6px;white-space:nowrap">${v.data}</td>
+          <td style="padding:6px;font-weight:600">${v.nome}</td>
+          <td style="padding:6px">${v.vaga}</td>
+          <td style="padding:6px;color:var(--cinza-4)">${v.origem}</td>
+        </tr>`).join("")}
+        </tbody>
+      </table>`;
+  }
+  abrirModal("modal-livro-vol");
+}
+
+function exportarLivroVoluntariosPDF() {
+  if (!livroVoluntarios.length) { toast("Nenhum voluntário para exportar","alerta"); return; }
+  const cont = {};
+  livroVoluntarios.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
+  const ranking = Object.entries(cont).sort((a,b)=>b[1]-a[1]);
+  const win = window.open("","_blank");
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório de Voluntários — COOPANEST-PE</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a}
+      h1{color:#00823e;font-size:20px;border-bottom:3px solid #00823e;padding-bottom:8px}
+      h2{color:#0a5c3a;font-size:15px;margin-top:24px}
+      table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
+      th{background:#073d28;color:#fff;padding:8px;text-align:left}
+      td{padding:7px;border-bottom:1px solid #ddd}
+      tr:nth-child(even){background:#f7f7f7}
+      .rank{display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #eee}
+      .meta{font-size:11px;color:#888;margin-top:4px}
+    </style></head><body>
+    <h1>Relatório de Voluntários — Mercado de Trabalho</h1>
+    <div class="meta">COOPANEST-PE · Comissão de Plantões · Gerado em ${hojeBR()}</div>
+    <h2>Ranking de plantões assumidos</h2>
+    ${ranking.map(([nome,n])=>`<div class="rank"><span>${nome}</span><strong>${n} vaga(s)</strong></div>`).join("")}
+    <h2>Histórico completo (${livroVoluntarios.length} registros)</h2>
+    <table><thead><tr><th>Data</th><th>Voluntário</th><th>Vaga assumida</th><th>Origem</th></tr></thead>
+    <tbody>${livroVoluntarios.slice().reverse().map(v=>`<tr><td>${v.data}</td><td><b>${v.nome}</b></td><td>${v.vaga}</td><td>${v.origem}</td></tr>`).join("")}</tbody></table>
+    </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(), 400);
+  toast("📄 Relatório aberto — use Imprimir → Salvar como PDF");
 }
 
 async function acaoDeletarVaga(id, hospital) {
