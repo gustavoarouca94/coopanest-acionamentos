@@ -642,14 +642,15 @@ table { min-width: 600px; }
             <option value="menor72">Menos de 72 horas (reposição obrigatória)</option>
             <option value="maior72">72 horas ou mais (sem reposição)</option>
           </select>
-          <!-- Dias de afastamento — campo extra para calcular validade do comprovante -->
+          <!-- Dias de afastamento — obrigatório para doença ≥ 72h -->
           <div style="margin-top:10px">
             <label style="font-size:12px;font-weight:600;color:var(--texto-2);display:block;margin-bottom:5px">
-              Dias de afastamento <span style="font-weight:400;color:var(--cinza-4)">(para calcular validade do comprovante)</span>
+              Dias de afastamento <span class="req" id="dias-afast-req" style="display:none">*</span> <span style="font-weight:400;color:var(--cinza-4)">(conforme o atestado)</span>
             </label>
             <input type="number" id="a-dias-afastamento" min="1" max="365"
               placeholder="Ex: 3" style="width:100%"
               oninput="onDiasAfastamentoChange()">
+            <div class="msg-erro" id="erro-a-dias-afastamento">Informe o número de dias de afastamento do atestado.</div>
           </div>
           <!-- Validade calculada automaticamente -->
           <div id="duracao-validade-info" style="display:none;margin-top:8px;padding:9px 13px;
@@ -1285,6 +1286,12 @@ function onDuracaoChange() {
   // Mostra/oculta bloco de reposição (regra binária original)
   const exigeRep = d === "menor72";
   campo("bloco-reposicao").classList.toggle("vis", d === "menor72");
+
+  // Dias de afastamento passa a ser obrigatório para doença ≥ 72h
+  const m = val("a-motivo");
+  const ehDoenca = m === "Doença/Atestado Médico";
+  const reqMark = document.getElementById("dias-afast-req");
+  if (reqMark) reqMark.style.display = (ehDoenca && d === "maior72") ? "inline" : "none";
 }
 
 // ════ MÚLTIPLOS PLANTÕES ════
@@ -1465,6 +1472,24 @@ async function enviarAcionamento() {
     ok = false;
   } else marcarErro("erro-a-duracao", false);
 
+  // Dias de afastamento é OBRIGATÓRIO para doença com afastamento ≥ 72h
+  // (não derivamos valor — o dado tem que ser real para análise de tempo médio)
+  const ehDoenca = m === "Doença/Atestado Médico";
+  const diasAfastVal = parseInt(val("a-dias-afastamento") || "0") || 0;
+  if (ehDoenca && duracaoVal === "maior72") {
+    if (diasAfastVal < 1) {
+      marcarErro("erro-a-dias-afastamento", true);
+      campo("a-dias-afastamento") && campo("a-dias-afastamento").classList.add("erro");
+      ok = false;
+    } else {
+      marcarErro("erro-a-dias-afastamento", false);
+      campo("a-dias-afastamento") && campo("a-dias-afastamento").classList.remove("erro");
+    }
+  } else {
+    marcarErro("erro-a-dias-afastamento", false);
+    campo("a-dias-afastamento") && campo("a-dias-afastamento").classList.remove("erro");
+  }
+
   const duracaoNumFinal = (() => {
     if (!duracaoVal) return 0;
     if (duracaoVal === "outro") return parseInt(diasLivreVal||"0")||0;
@@ -1513,14 +1538,7 @@ async function enviarAcionamento() {
         if (d === "outro") return val("a-dias-livre") || "";
         return d; // número de dias como string
       })(),
-      diasAfastamento: (() => {
-        const d = val("a-duracao-atestado");
-        if (d === "outro") return parseInt(val("a-dias-livre")||"0") || 0;
-        if (d && d !== "menor72" && d !== "maior72") return parseInt(d) || 0;
-        if (d === "menor72") return 1;
-        if (d === "maior72") return 7;
-        return 0;
-      })(),
+      diasAfastamento: parseInt(campo("a-dias-afastamento")?.value || "0") || 0,
       dataFimAfastamento: (() => {
         const d = val("a-duracao-atestado");
         const dp = val("a-data-plantao");
