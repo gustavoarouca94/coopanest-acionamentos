@@ -368,7 +368,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--info);vertical-align:middle"></span> Gestacional</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--verde-d);vertical-align:middle"></span> Vaga em aberto</span>
     <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--roxo);vertical-align:middle"></span> Quinzenal</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#be185d;vertical-align:middle"></span> Acionamento pontual</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--amarelo);vertical-align:middle"></span> 🔄 Reposição agendada</span>
   </div>
   <div id="escala-grid" class="escala-grid"></div>
 </div>
@@ -714,9 +714,10 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
     </div>
     <div class="modal-body">
       <div class="aviso-box aviso-info" style="margin-bottom:14px">
-        Cole a lista do documento Word. Uma vaga por linha. Formatos aceitos:<br>
-        <code style="font-size:11px">Hospital · Slot · Dias · Turno</code> &nbsp;ou&nbsp; <code style="font-size:11px">Hospital - Slot - Dia - Turno</code><br>
-        <span style="font-size:11px;color:var(--cinza-4)">Separadores aceitos: · | ; tab ou hífen. Linhas em branco são ignoradas.</span>
+        Cole a lista <strong>exatamente como está</strong> no documento Word. O sistema entende o formato hierárquico:<br>
+        <code style="font-size:11px">HOSPITAL (linha de cabeçalho)</code><br>
+        <code style="font-size:11px">DIA TURNO HORÁRIO (detalhes)</code><br>
+        <span style="font-size:11px;color:var(--cinza-4)">Reconhece: dias por extenso ou abreviados, "QUINZENAL/15-15d", "(2 VAGAS)" cria 2 vagas, "Bloco A" como subdivisão. Cabeçalhos de hospital viram o nome da unidade automaticamente.</span>
       </div>
       <div class="campo">
         <label>Lista de vagas</label>
@@ -1446,9 +1447,19 @@ function renderEscala() {
   const DIAS_SEM_NOME = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
   const hoje = DIAS_SEM_NOME[new Date().getDay()];
 
-  // ── FONTE 1: Reposições (acionamentos com exigeRep + Pendente + dataRep)
+  // Limites da semana exibida (segunda 00h → domingo 23h59)
+  const semIni = new Date(segInicio); semIni.setHours(0,0,0,0);
+  const semFim = new Date(segInicio); semFim.setDate(semFim.getDate()+6); semFim.setHours(23,59,59,999);
+  function naSemana(dataStr) {
+    const d = parseDataBR(normData(dataStr));
+    if (!d || isNaN(d)) return false;
+    d.setHours(12,0,0,0);
+    return d >= semIni && d <= semFim;
+  }
+
+  // ── FONTE 1: Reposições agendadas — apenas as que caem NA semana exibida
   const reposicoes = [
-    ...acionamentos.filter(a=>a.exigeRep&&a.statusRep==="Pendente"&&a.dataRep&&a.dataRep!=="—").map(a=>({
+    ...acionamentos.filter(a=>a.exigeRep&&a.statusRep==="Pendente"&&a.dataRep&&a.dataRep!=="—"&&naSemana(a.dataRep)).map(a=>({
       dia:     diaSemana(a.dataRep),
       turnoK:  tn(a.turnoRep),
       nome:    a.nome,
@@ -1459,7 +1470,7 @@ function renderEscala() {
       turnoLbl:a.turnoRep,
       protocolo:a.protocolo,
     })),
-    ...reposManual.map(r=>({
+    ...reposManual.filter(r=>naSemana(r.data)).map(r=>({
       dia:     r.dia,
       turnoK:  tn(r.turno),
       nome:    r.nome+(r.reserva?" → "+r.reserva:""),
@@ -1496,18 +1507,6 @@ function renderEscala() {
     });
   });
 
-  // ── FONTE 4: Acionamentos pontuais (plantão coberto pelo reserva), inclui plantões extras
-  const entAcion = [];
-  acionamentos.filter(a=>a.dataPlantao && a.dataPlantao!=="—").forEach(a=>{
-    const dia = diaSemana(a.dataPlantao);
-    if (!dia) return;
-    entAcion.push({
-      dia, turnoK:tn(a.turno),
-      nome:a.nome, hospital:a.hospital, slot:(a.isPlantaoExtra?"↳ Plantão extra":"Acionamento")+(a.motivo?" · "+a.motivo:""),
-      tipo:"acionamento", data:a.dataPlantao, protocolo:a.protocolo, isExtra:a.isPlantaoExtra,
-    });
-  });
-
   // ── Render lista de reposições avulsas
   const repEl = document.getElementById("escala-reps-lista");
   const repsAvulsas = reposManual;
@@ -1535,8 +1534,8 @@ function renderEscala() {
     const eHoje = semanaOffset===0 && dia===hoje;
 
     const reps   = reposicoes.filter(r=>r.dia===dia);
-    const fixosD = [...entLicencas,...entVagas,...entAcion].filter(e=>e.dia===dia&&e.turnoK==="D");
-    const fixosN = [...entLicencas,...entVagas,...entAcion].filter(e=>e.dia===dia&&e.turnoK==="N");
+    const fixosD = [...entLicencas,...entVagas].filter(e=>e.dia===dia&&e.turnoK==="D");
+    const fixosN = [...entLicencas,...entVagas].filter(e=>e.dia===dia&&e.turnoK==="N");
     const repsD  = reps.filter(r=>r.turnoK==="D");
     const repsN  = reps.filter(r=>r.turnoK==="N");
 
@@ -2167,35 +2166,128 @@ function abrirModalColarVagas() {
 }
 
 function parseVagasTexto(txt) {
-  const linhas = txt.split("\n").map(l=>l.trim()).filter(l=>l.length>2);
-  const DIAS = {seg:"Seg",ter:"Ter",qua:"Qua",qui:"Qui",sex:"Sex","sáb":"Sáb",sab:"Sáb",dom:"Dom"};
-  const vagasParsed = [];
-  linhas.forEach((linha,idx)=>{
-    // Detecta separador: · | ; tab ou hífen entre espaços
-    let partes = linha.split(/\s*[·|;\t]\s*|\s+-\s+/).map(p=>p.trim()).filter(Boolean);
-    if (partes.length < 2) return;
-    const hospital = partes[0];
-    const slot     = partes[1] || "";
-    // Procura dias e turno nas partes restantes
-    let dias = [], turno = "";
-    partes.slice(2).forEach(p=>{
-      const pl = p.toLowerCase();
-      // Verifica se é dia da semana
-      const diaMatch = Object.keys(DIAS).find(d=>pl.includes(d));
-      if (diaMatch && p.length<=8) { dias.push(DIAS[diaMatch]); }
-      else if (/\d|manhã|tarde|noturno|diurno|noite/i.test(p)) { turno = p; }
-      else if (!turno) { turno = p; }
-    });
-    // Se não achou dias nas partes >2, tenta na parte do slot
-    if (!dias.length) {
-      Object.keys(DIAS).forEach(d=>{ if (slot.toLowerCase().includes(d)) dias.push(DIAS[d]); });
+  const linhasRaw = txt.split("\n").map(l=>l.trim()).filter(Boolean);
+
+  // Mapa de dias: reconhece nome completo e abreviado, com/sem acento
+  const DIA_MAP = [
+    [/\b(segunda|seg)\b/i, "Seg"],
+    [/\b(ter[çc]a|ter)\b/i, "Ter"],
+    [/\b(quarta|qua)\b/i, "Qua"],
+    [/\b(quinta|qui)\b/i, "Qui"],
+    [/\b(sexta|sex)\b/i, "Sex"],
+    [/\b(s[áa]bado|s[áa]b|sab)\b/i, "Sáb"],
+    [/\b(domingo|dom)\b/i, "Dom"],
+  ];
+
+  function achaDia(s) {
+    for (const [re, dia] of DIA_MAP) if (re.test(s)) return dia;
+    return null;
+  }
+
+  // Uma linha é HOSPITAL (cabeçalho) se NÃO contém dia da semana
+  // (linhas de plantão sempre começam com um dia)
+  function ehHospital(s) {
+    return achaDia(s) === null;
+  }
+
+  // Detecta turno pela presença de horário ou palavra-chave
+  function achaTurno(s) {
+    const sl = s.toLowerCase();
+    // Extrai faixa horária tipo "13-19h", "7-13h", "19h-07h", "12h"
+    const mFaixa = s.match(/\d{1,2}\s*[-\/h]\s*\d{0,2}\s*h?/i);
+    if (/noite|noturno/i.test(sl)) return "Noturno (19h–07h)";
+    if (/manh[ãa]/i.test(sl)) return "Manhã (07h–13h)" + (mFaixa?"":"");
+    if (/tarde/i.test(sl)) return "Tarde (13h–19h)";
+    if (/diurno/i.test(sl)) return "Diurno (07h–19h)";
+    if (mFaixa) return mFaixa[0].replace(/\s+/g,"");
+    return "";
+  }
+
+  // Detecta tipo (quinzenal vs semanal vs padrão)
+  function achaTipo(s) {
+    if (/quinzenal|15\/15|15 ?d|\(1[45]\/1[45]/i.test(s)) return "vago_quinzenal";
+    return "vago";
+  }
+
+  // Detecta nº de vagas: "(2 VAGAS)" → 2
+  function achaQtd(s) {
+    const m = s.match(/(\d+)\s*vagas?/i);
+    return m ? parseInt(m[1]) : 1;
+  }
+
+  const vagas = [];
+  let hospitalAtual = "";
+  let subHospital   = ""; // ex: "Bloco A"
+
+  linhasRaw.forEach((linha) => {
+    // Remove marcadores de cabeçalho (* no fim) e normaliza
+    const limpa = linha.replace(/\*+\s*$/, "").trim();
+    if (!limpa) return;
+
+    // Seção que é só rótulo geral (ignora como divisor, não cria vaga)
+    if (/^plant[õo]es?\s+rede\s+suplementar$/i.test(limpa)) { return; }
+
+    if (ehHospital(limpa)) {
+      // É cabeçalho de hospital OU sub-cabeçalho.
+      // Sub-cabeçalho é APENAS "Bloco X" (subdivisão dentro do mesmo hospital).
+      // Todo o resto é um hospital/unidade nova.
+      if (/^bloco\b/i.test(limpa) && hospitalAtual) {
+        subHospital = limpa;
+      } else {
+        hospitalAtual = limpa;
+        subHospital = "";
+      }
+      return;
     }
-    vagasParsed.push({
-      id: "VGX"+Date.now().toString().slice(-6)+idx,
-      hospital, slot, dias, turno: turno||"6h", tipo:"vago", status:"Aberta", voluntario:"", obs:"Importada"
-    });
+
+    // É uma linha de plantão
+    const dia   = achaDia(limpa);
+    const turno = achaTurno(limpa);
+    const tipo  = achaTipo(limpa);
+    const qtd   = achaQtd(limpa);
+
+    // Extrai a observação entre parênteses, ignorando "X VAGAS" e "SEMANAL"
+    const mObs = limpa.match(/\(([^)]+)\)/g);
+    const obs  = mObs
+      ? mObs.map(x=>x.replace(/[()]/g,"").trim())
+            .filter(o=>!/^\d+\s*vagas?$/i.test(o) && !/^semanal$/i.test(o))
+            .join(" · ")
+      : "";
+
+    // Slot = descrição do plantão sem os parênteses
+    const slot = limpa.replace(/\s*\([^)]*\)/g,"").trim();
+
+    const hospitalFull = hospitalAtual + (subHospital ? " — "+subHospital : "");
+
+    for (let k=0; k<qtd; k++) {
+      vagas.push({
+        _hospital: hospitalFull,
+        _dia: dia,
+        _turno: turno || "6h",
+        _tipo: tipo,
+        _slot: slot,
+        _obs: obs,
+        hospital: hospitalFull,
+        slot: slot,
+        dias: dia ? [dia] : [],
+        turno: turno || "6h",
+        tipo: tipo,
+        status: "Aberta",
+        voluntario: "",
+        obs: obs + (qtd>1?" · vaga "+(k+1)+"/"+qtd:""),
+      });
+    }
   });
-  return vagasParsed;
+
+  // Gera IDs determinísticos (hash simples de hospital+dia+turno) p/ evitar duplicação
+  vagas.forEach((v,i)=>{
+    const chave = (v._hospital+"|"+v._dia+"|"+v._turno+"|"+v._slot+"|"+i).replace(/\s+/g,"");
+    let h=0; for (let c=0;c<chave.length;c++){ h=((h<<5)-h+chave.charCodeAt(c))|0; }
+    v.id = "VGI"+Math.abs(h).toString(36).slice(0,8).toUpperCase();
+    delete v._hospital; delete v._dia; delete v._turno; delete v._tipo; delete v._slot; delete v._obs;
+  });
+
+  return vagas;
 }
 
 function previewColarVagas() {
@@ -2214,15 +2306,24 @@ async function importarColarVagas() {
   const txt = document.getElementById("colar-vagas-txt").value;
   const parsed = parseVagasTexto(txt);
   if (!parsed.length) { toast("Nenhuma vaga reconhecida","erro"); return; }
-  if (!confirm("Importar "+parsed.length+" vaga(s)? Elas serão adicionadas às vagas em aberto.")) return;
 
-  vagas.push(...parsed.map(normVaga));
+  // Anti-duplicação: chave = hospital+dia+turno+slot normalizado
+  const chaveDe = v => (v.hospital+"|"+(v.dias||[]).join(",")+"|"+v.turno+"|"+v.slot).toLowerCase().replace(/\s+/g,"");
+  const existentes = new Set(vagas.map(chaveDe));
+  const novas = parsed.filter(v => !existentes.has(chaveDe(v)));
+  const duplicadas = parsed.length - novas.length;
+
+  if (!novas.length) { toast("Todas as "+parsed.length+" vagas já existem — nada a importar","alerta"); return; }
+
+  const msg = "Importar "+novas.length+" vaga(s)?"+(duplicadas>0?"\n("+duplicadas+" já existentes serão ignoradas)":"");
+  if (!confirm(msg)) return;
+
+  vagas.push(...novas.map(normVaga));
   fecharModal("modal-colar-vagas");
   renderTudo();
-  toast("✓ "+parsed.length+" vaga(s) importada(s)");
+  toast("✓ "+novas.length+" vaga(s) importada(s)"+(duplicadas>0?" · "+duplicadas+" ignorada(s)":""));
 
-  // Salva cada uma no GS
-  for (const v of parsed) {
+  for (const v of novas) {
     try { await apiPost({action:"criarVaga", vaga:v}); }
     catch(e) { /* continua mesmo se uma falhar */ }
   }
