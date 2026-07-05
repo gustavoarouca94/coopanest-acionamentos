@@ -326,6 +326,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
       <button class="filtro-btn" onclick="setFiltroVg('reserva',this)">Reserva</button>
     </div>
     <button class="btn btn-outline btn-sm" onclick="abrirModalColarVagas()">📋 Colar lista</button>
+    <button class="btn btn-outline btn-sm" onclick="removerVagasDuplicadas()">🧹 Remover duplicatas</button>
     <button class="btn btn-outline btn-sm" onclick="abrirLivroVoluntarios()">👥 Voluntários</button>
     <button class="btn btn-verde btn-sm" onclick="abrirModalVaga()">+ Nova vaga</button>
   </div>
@@ -842,6 +843,7 @@ function normVaga(v) {
     slot:      normStr(v.slot || ""),
     dias:      normDias(v.dias),
     turno:     normStr(v.turno || ""),
+    turnoCat:  normStr(v.turnoCat || "") || catTurno(v.turno),
     tipo:      normStr(v.tipo || "vago"),
     status:    normStr(v.status || "Aberta"),
     voluntario:normStr(v.voluntario || ""),
@@ -1430,6 +1432,17 @@ function setFiltroEscala(f, el) {
 
 // Normaliza turno para "D" (diurno) ou "N" (noturno)
 const tn = t => (t||"").toLowerCase().includes("noturno")?"N":"D";
+
+// Categoriza turno em manha/tarde/noite/diurno pela faixa horária ou palavra-chave.
+// Usado para escala semanal (via tn) e futura escala completa dos serviços.
+function catTurno(t) {
+  const s = String(t||"").toLowerCase();
+  if (/noturno|noite/.test(s) || /19\s*h?\s*[-–/]\s*0?7/.test(s)) return "noite";
+  if (/manh|(^|[^0-9])0?7\s*h?\s*[-–/]\s*13/.test(s)) return "manha";
+  if (/tarde|13\s*h?\s*[-–/]\s*19/.test(s)) return "tarde";
+  if (/diurno|0?7\s*h?\s*[-–/]\s*19|12\s*h/.test(s)) return "diurno";
+  return "";
+}
 
 function renderEscala() {
   const [segInicio, ] = semanaInicioFim(semanaOffset);
@@ -2158,6 +2171,48 @@ async function salvarAvisoManual() {
   } catch(e) { toast("⚠️ Erro ao salvar no GS","alerta"); }
 }
 
+// ── REMOVE VAGAS DUPLICADAS (limpeza)
+async function removerVagasDuplicadas() {
+  const normChave = s => String(s||"")
+    .toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/\([^)]*\)/g,"")
+    .replace(/[—–\-|·:]/g," ")
+    .replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
+  const turnoG = s => {
+    const t = String(s||"").toLowerCase();
+    if (/noturno|noite/.test(t) || /19\s*h?\s*[-–/]\s*0?7/.test(t)) return "NOITE";
+    if (/manh|7\s*h?\s*[-–/]\s*13|07\s*[-–/]\s*13/.test(t)) return "MANHA";
+    if (/tarde|13\s*h?\s*[-–/]\s*19/.test(t)) return "TARDE";
+    if (/diurno|7\s*h?\s*[-–/]\s*19|07\s*[-–/]\s*19|12\s*h/.test(t)) return "DIURNO";
+    return "OUTRO";
+  };
+  const chaveDe = v => [normChave(v.hospital),(v.dias||[]).slice().sort().join(","),turnoG(v.turno)].join("|");
+
+  const vistas = new Set();
+  const manter = [];
+  const remover = [];
+  vagas.forEach(v => {
+    const k = chaveDe(v);
+    if (vistas.has(k)) { remover.push(v); }
+    else { vistas.add(k); manter.push(v); }
+  });
+
+  if (!remover.length) { toast("Nenhuma duplicata encontrada ✓"); return; }
+  if (!confirm("Encontradas "+remover.length+" vaga(s) duplicada(s).\nManter "+manter.length+" única(s) e remover as repetidas?")) return;
+
+  vagas = manter;
+  renderTudo();
+  toast("🧹 "+remover.length+" duplicata(s) removida(s)");
+
+  // Remove do GS as duplicatas que têm ID persistido
+  for (const v of remover) {
+    if (v.id) {
+      try { await apiPost({action:"deletarVaga", id:v.id}); }
+      catch(e) { /* continua */ }
+    }
+  }
+}
+
 // ── COLAR LISTA DE VAGAS (import em massa)
 function abrirModalColarVagas() {
   document.getElementById("colar-vagas-txt").value = "";
@@ -2259,6 +2314,10 @@ function parseVagasTexto(txt) {
 
     const hospitalFull = hospitalAtual + (subHospital ? " — "+subHospital : "");
 
+    // Categoria de turno normalizada — calculada da linha inteira (mais robusto
+    // que só do texto do turno, pois "SEGUNDA TARDE 13-19H" tem a pista completa)
+    const turnoCat = catTurno(limpa) || catTurno(turno);
+
     for (let k=0; k<qtd; k++) {
       vagas.push({
         _hospital: hospitalFull,
@@ -2271,6 +2330,7 @@ function parseVagasTexto(txt) {
         slot: slot,
         dias: dia ? [dia] : [],
         turno: turno || "6h",
+        turnoCat: turnoCat,
         tipo: tipo,
         status: "Aberta",
         voluntario: "",
@@ -2308,7 +2368,24 @@ async function importarColarVagas() {
   if (!parsed.length) { toast("Nenhuma vaga reconhecida","erro"); return; }
 
   // Anti-duplicação: chave = hospital+dia+turno+slot normalizado
-  const chaveDe = v => (v.hospital+"|"+(v.dias||[]).join(",")+"|"+v.turno+"|"+v.slot).toLowerCase().replace(/\s+/g,"");
+  // Normalização robusta: remove acentos, travessões, parênteses/horários.
+  const normChave = s => String(s||"")
+    .toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/\([^)]*\)/g,"")
+    .replace(/[—–\-|·:]/g," ")
+    .replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
+  // Turno granular por faixa horária (manhã/tarde/noite/diurno)
+  const turnoG = s => {
+    const t = String(s||"").toLowerCase();
+    if (/noturno|noite/.test(t) || /19\s*h?\s*[-–/]\s*0?7/.test(t)) return "NOITE";
+    if (/manh|7\s*h?\s*[-–/]\s*13|07\s*[-–/]\s*13/.test(t)) return "MANHA";
+    if (/tarde|13\s*h?\s*[-–/]\s*19/.test(t)) return "TARDE";
+    if (/diurno|7\s*h?\s*[-–/]\s*19|07\s*[-–/]\s*19|12\s*h/.test(t)) return "DIURNO";
+    return "OUTRO";
+  };
+  // Chave = hospital + dias + turno granular (slot é inconfiável entre origens)
+  const chaveDe = v => [normChave(v.hospital),(v.dias||[]).slice().sort().join(","),turnoG(v.turno)].join("|");
+
   const existentes = new Set(vagas.map(chaveDe));
   const novas = parsed.filter(v => !existentes.has(chaveDe(v)));
   const duplicadas = parsed.length - novas.length;
