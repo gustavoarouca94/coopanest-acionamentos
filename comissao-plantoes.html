@@ -1088,6 +1088,9 @@ function cardAcionamento(a) {
   }
 
   const btns = [];
+  if (a.linkAtestado) {
+    btns.push(`<a class="btn btn-info btn-sm" href="${a.linkAtestado}" target="_blank" rel="noopener">📄 Ver atestado ↗</a>`);
+  }
   if (isPendAtestado(a)||isVencido(a)) {
     btns.push(`<button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="acaoConfirmarAtestado(this.dataset.prot)">✓ Confirmar documento</button>`);
     btns.push(`<button class="btn btn-outline btn-sm" data-prot="${a.protocolo}" onclick="acaoDispensarAtestado(this.dataset.prot)">⊘ Dispensar</button>`);

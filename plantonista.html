@@ -1166,8 +1166,9 @@ async function lerArquivoBase64(file) {
   });
 }
 
-// Limite: 4MB em base64 (~3MB de arquivo) — Apps Script rejeita payloads maiores silenciosamente
-const MAX_ARQUIVO_BYTES = 3 * 1024 * 1024; // 3MB
+// Limite: 8MB de arquivo — Apps Script aceita payloads bem maiores que isso;
+// 3MB era conservador demais e barrava atestados normais (fotos/PDFs de documento)
+const MAX_ARQUIVO_BYTES = 8 * 1024 * 1024; // 8MB
 
 // ── ENVIO AO APPS SCRIPT
 async function postar(payload) {
