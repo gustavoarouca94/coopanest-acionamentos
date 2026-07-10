@@ -256,6 +256,8 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
 ════════════════════════════════════ -->
 <div class="tela" id="tela-historico">
   <div class="filtros">
+    <select id="hist-mes" onchange="renderHist()" style="padding:7px 12px;border:1px solid var(--cinza-2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;cursor:pointer;font-weight:600">
+    </select>
     <button class="filtro-btn ativo" onclick="setFiltroHist('todos',this)">Todos</button>
     <button class="filtro-btn" onclick="setFiltroHist('am',this)">Atestado médico</button>
     <button class="filtro-btn" onclick="setFiltroHist('rep',this)">Com reposição</button>
@@ -993,6 +995,7 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) carrega
 // ════════════════════════════════════════════════════════
 
 function renderTudo() {
+  popularSeletorMes();
   renderStats();
   renderPend();
   renderHist();
@@ -1144,9 +1147,49 @@ function setFiltroHist(f, el) {
   renderHist();
 }
 
+// Extrai "AAAA-MM" de uma data DD/MM/AAAA
+function mesDeData(dstr) {
+  if (!dstr) return "";
+  const p = String(dstr).split("/");
+  if (p.length < 3) return "";
+  return p[2]+"-"+String(p[1]).padStart(2,"0");
+}
+
+// Rótulo legível "Julho 2026" a partir de "2026-07"
+function rotuloMes(am) {
+  if (!am) return "";
+  const [ano,mes] = am.split("-");
+  const nomes = ["","Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  return nomes[parseInt(mes)]+" "+ano;
+}
+
+// Popula o seletor de meses com base nos acionamentos + mês vigente
+function popularSeletorMes() {
+  const sel = document.getElementById("hist-mes");
+  if (!sel) return;
+  // Coleta meses únicos dos acionamentos (por dataPlantao)
+  const meses = new Set();
+  acionamentos.forEach(a=>{ const m=mesDeData(a.dataPlantao); if(m) meses.add(m); });
+  // Garante o mês vigente na lista
+  const hoje = new Date();
+  const mesVigente = hoje.getFullYear()+"-"+String(hoje.getMonth()+1).padStart(2,"0");
+  meses.add(mesVigente);
+  // Ordena do mais recente para o mais antigo
+  const ordenados = [...meses].sort().reverse();
+  const valorAtual = sel.value; // preserva seleção se já havia
+  sel.innerHTML =
+    `<option value="todos">📅 Todos os meses</option>` +
+    ordenados.map(m=>`<option value="${m}">${rotuloMes(m)}</option>`).join("");
+  // Default: mês vigente (ou preserva o que estava selecionado)
+  sel.value = valorAtual && [...sel.options].some(o=>o.value===valorAtual)
+    ? valorAtual : mesVigente;
+}
+
 function renderHist() {
   const busca = (document.querySelector("#tela-historico .busca-input")||{value:""}).value.toLowerCase();
+  const mesSel = (document.getElementById("hist-mes")||{value:"todos"}).value;
   let itens = [...acionamentos];
+  if (mesSel && mesSel!=="todos") itens=itens.filter(a=>mesDeData(a.dataPlantao)===mesSel);
   if (filtroHist==="am")   itens=itens.filter(a=>a.motivo==="Doença/Atestado Médico");
   if (filtroHist==="rep")  itens=itens.filter(a=>a.exigeRep);
   if (filtroHist==="disc") itens=itens.filter(a=>a.motivo==="Afastamento disciplinar");
