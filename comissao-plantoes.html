@@ -637,6 +637,11 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
       <button class="btn-fechar" onclick="fecharModal('modal-livro-vol')">✕</button>
     </div>
     <div class="modal-body">
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label style="font-size:12px;font-weight:600;color:var(--cinza-4)">Período:</label>
+        <select id="livro-vol-mes" onchange="abrirLivroVoluntarios()" style="padding:6px 12px;border:1px solid var(--cinza-2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;cursor:pointer;font-weight:600">
+        </select>
+      </div>
       <div id="livro-vol-conteudo"></div>
     </div>
     <div class="modal-footer">
@@ -2453,19 +2458,46 @@ async function importarColarVagas() {
 }
 
 // ── LIVRO DE VOLUNTÁRIOS (mercado de trabalho)
+function popularSeletorMesLivro() {
+  const sel = document.getElementById("livro-vol-mes");
+  if (!sel) return;
+  const meses = new Set();
+  livroVoluntarios.forEach(v=>{ const m=mesDeData(v.data); if(m) meses.add(m); });
+  const hoje = new Date();
+  const mesVigente = hoje.getFullYear()+"-"+String(hoje.getMonth()+1).padStart(2,"0");
+  meses.add(mesVigente);
+  const ordenados = [...meses].sort().reverse();
+  const valorAtual = sel.value;
+  sel.innerHTML =
+    `<option value="todos">📅 Todos os meses</option>` +
+    ordenados.map(m=>`<option value="${m}">${rotuloMes(m)}</option>`).join("");
+  sel.value = valorAtual && [...sel.options].some(o=>o.value===valorAtual)
+    ? valorAtual : mesVigente;
+}
+
+function livroFiltrado() {
+  const sel = document.getElementById("livro-vol-mes");
+  const mesSel = sel ? sel.value : "todos";
+  if (!mesSel || mesSel==="todos") return livroVoluntarios.slice();
+  return livroVoluntarios.filter(v=>mesDeData(v.data)===mesSel);
+}
+
 function abrirLivroVoluntarios() {
+  popularSeletorMesLivro();
   const box = document.getElementById("livro-vol-conteudo");
-  if (!livroVoluntarios.length) {
-    box.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-3)">Nenhum voluntário registrado ainda.<br><span style="font-size:12px">Os nomes aparecem aqui ao preencher vagas ou encerrar avisos prévios.</span></div>`;
+  const lista = livroFiltrado();
+  const sel = document.getElementById("livro-vol-mes");
+  const periodoLbl = (sel && sel.value!=="todos") ? rotuloMes(sel.value) : "todos os meses";
+  if (!lista.length) {
+    box.innerHTML = `<div style="text-align:center;padding:40px;color:var(--cinza-3)">Nenhum voluntário registrado em ${periodoLbl}.<br><span style="font-size:12px">Os nomes aparecem aqui ao preencher vagas ou encerrar avisos prévios.</span></div>`;
   } else {
-    // Agrupa por voluntário para contagem
     const cont = {};
-    livroVoluntarios.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
+    lista.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
     const ranking = Object.entries(cont).sort((a,b)=>b[1]-a[1]);
 
     box.innerHTML = `
       <div style="margin-bottom:14px;padding:12px;background:var(--cinza-0);border-radius:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--verde);margin-bottom:6px">RANKING — plantões assumidos</div>
+        <div style="font-size:12px;font-weight:700;color:var(--verde);margin-bottom:6px">RANKING — plantões assumidos · ${periodoLbl} (${lista.length})</div>
         ${ranking.map(([nome,n])=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>${nome}</span><strong>${n} vaga(s)</strong></div>`).join("")}
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -2473,7 +2505,7 @@ function abrirLivroVoluntarios() {
           <th style="padding:6px">Data</th><th style="padding:6px">Voluntário</th><th style="padding:6px">Vaga assumida</th><th style="padding:6px">Origem</th>
         </tr></thead>
         <tbody>
-        ${livroVoluntarios.slice().reverse().map(v=>`<tr style="border-bottom:1px solid var(--cinza-1)">
+        ${lista.slice().reverse().map(v=>`<tr style="border-bottom:1px solid var(--cinza-1)">
           <td style="padding:6px;white-space:nowrap">${v.data}</td>
           <td style="padding:6px;font-weight:600">${v.nome}</td>
           <td style="padding:6px">${v.vaga}</td>
@@ -2486,9 +2518,12 @@ function abrirLivroVoluntarios() {
 }
 
 function exportarLivroVoluntariosPDF() {
-  if (!livroVoluntarios.length) { toast("Nenhum voluntário para exportar","alerta"); return; }
+  const lista = livroFiltrado();
+  if (!lista.length) { toast("Nenhum voluntário para exportar neste período","alerta"); return; }
+  const sel = document.getElementById("livro-vol-mes");
+  const periodoLbl = (sel && sel.value!=="todos") ? rotuloMes(sel.value) : "Todos os meses";
   const cont = {};
-  livroVoluntarios.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
+  lista.forEach(v=>{ cont[v.nome]=(cont[v.nome]||0)+1; });
   const ranking = Object.entries(cont).sort((a,b)=>b[1]-a[1]);
   const win = window.open("","_blank");
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório de Voluntários — COOPANEST-PE</title>
@@ -2502,18 +2537,20 @@ function exportarLivroVoluntariosPDF() {
       tr:nth-child(even){background:#f7f7f7}
       .rank{display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #eee}
       .meta{font-size:11px;color:#888;margin-top:4px}
+      .periodo{display:inline-block;background:#e8f5ee;color:#00823e;font-weight:700;padding:4px 12px;border-radius:6px;font-size:13px;margin-top:8px}
     </style></head><body>
     <h1>Relatório de Voluntários — Mercado de Trabalho</h1>
     <div class="meta">COOPANEST-PE · Comissão de Plantões · Gerado em ${hojeBR()}</div>
+    <div class="periodo">📅 Período: ${periodoLbl}</div>
     <h2>Ranking de plantões assumidos</h2>
     ${ranking.map(([nome,n])=>`<div class="rank"><span>${nome}</span><strong>${n} vaga(s)</strong></div>`).join("")}
-    <h2>Histórico completo (${livroVoluntarios.length} registros)</h2>
+    <h2>Histórico (${lista.length} registros)</h2>
     <table><thead><tr><th>Data</th><th>Voluntário</th><th>Vaga assumida</th><th>Origem</th></tr></thead>
-    <tbody>${livroVoluntarios.slice().reverse().map(v=>`<tr><td>${v.data}</td><td><b>${v.nome}</b></td><td>${v.vaga}</td><td>${v.origem}</td></tr>`).join("")}</tbody></table>
+    <tbody>${lista.slice().reverse().map(v=>`<tr><td>${v.data}</td><td><b>${v.nome}</b></td><td>${v.vaga}</td><td>${v.origem}</td></tr>`).join("")}</tbody></table>
     </body></html>`);
   win.document.close();
   setTimeout(()=>win.print(), 400);
-  toast("📄 Relatório aberto — use Imprimir → Salvar como PDF");
+  toast("📄 Relatório de "+periodoLbl+" aberto — use Imprimir → Salvar como PDF");
 }
 
 async function acaoDeletarVaga(id, hospital) {
