@@ -639,8 +639,8 @@ table { min-width: 600px; }
           <label for="a-duracao-atestado">Duração do afastamento <span class="req">*</span></label>
           <select id="a-duracao-atestado" onchange="onDuracaoChange()">
             <option value="">Selecione…</option>
-            <option value="menor72">Menos de 72 horas (reposição obrigatória)</option>
-            <option value="maior72">72 horas ou mais (sem reposição)</option>
+            <option value="menor72">72 horas ou menos (reposição obrigatória)</option>
+            <option value="maior72">Mais de 72 horas (sem reposição)</option>
           </select>
           <!-- Dias de afastamento — obrigatório para doença ≥ 72h -->
           <div style="margin-top:10px">
@@ -814,7 +814,7 @@ table { min-width: 600px; }
       <!-- Toggle de reposição — aparece quando protocolo é localizado e exige rep -->
       <div id="at-bloco-rep" style="display:none;">
         <div style="background:var(--alerta-bg);border-left:3px solid var(--alerta);border-radius:0 var(--r) var(--r) 0;padding:12px 14px;margin-bottom:14px;">
-          <strong style="color:var(--alerta);font-size:14px;">⚠️ Atestado &lt; 72h — reposição obrigatória</strong>
+          <strong style="color:var(--alerta);font-size:14px;">⚠️ Atestado de 72h ou menos — reposição obrigatória</strong>
           <p style="font-size:13px;color:#7c3200;margin-top:4px;">Defina abaixo a data e o turno em que você irá repor o plantão.</p>
         </div>
         <div class="dois-col">
