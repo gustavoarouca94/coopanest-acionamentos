@@ -321,24 +321,53 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
      ABA VAGAS EM ABERTO
 ════════════════════════════════════ -->
 <div class="tela" id="tela-vagas">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div class="filtros" style="margin:0;flex:1">
-      <button class="filtro-btn ativo" onclick="setFiltroVg('abertas',this)">Em aberto</button>
-      <button class="filtro-btn" onclick="setFiltroVg('preenchida',this)">Preenchidas</button>
-      <button class="filtro-btn" onclick="setFiltroVg('reserva',this)">Reserva</button>
+  <!-- Sub-navegação: Vagas estruturais × Cirurgias eletivas -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--cinza-1);padding-bottom:0">
+    <button id="subtab-vagas" class="subtab ativa" onclick="mudarSubVagas('vagas')" style="background:none;border:none;border-bottom:3px solid var(--verde);padding:8px 14px;font-weight:700;font-size:14px;color:var(--verde-d);cursor:pointer;margin-bottom:-2px">📋 Vagas em aberto</button>
+    <button id="subtab-eletivas" class="subtab" onclick="mudarSubVagas('eletivas')" style="background:none;border:none;border-bottom:3px solid transparent;padding:8px 14px;font-weight:600;font-size:14px;color:var(--cinza-4);cursor:pointer;margin-bottom:-2px">🔪 Cirurgias eletivas</button>
+  </div>
+
+  <!-- SUB-ABA: Vagas estruturais -->
+  <div id="sub-vagas">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="filtros" style="margin:0;flex:1">
+        <button class="filtro-btn ativo" onclick="setFiltroVg('abertas',this)">Em aberto</button>
+        <button class="filtro-btn" onclick="setFiltroVg('preenchida',this)">Preenchidas</button>
+        <button class="filtro-btn" onclick="setFiltroVg('reserva',this)">Reserva</button>
+      </div>
+      <select id="vg-ordenar" onchange="renderVg()" style="padding:7px 12px;border:1px solid var(--cinza-2);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;cursor:pointer;font-weight:600">
+        <option value="hospital">🏥 Por hospital / setor · dia</option>
+        <option value="criacao">🕐 Por data de criação</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="abrirModalColarVagas()">📋 Colar lista</button>
+      <button class="btn btn-outline btn-sm" onclick="removerVagasDuplicadas()">🧹 Remover duplicatas</button>
+      <button class="btn btn-outline btn-sm" onclick="abrirLivroVoluntarios()">👥 Voluntários</button>
+      <button class="btn btn-verde btn-sm" onclick="abrirModalVaga()">+ Nova vaga</button>
     </div>
-    <button class="btn btn-outline btn-sm" onclick="abrirModalColarVagas()">📋 Colar lista</button>
-    <button class="btn btn-outline btn-sm" onclick="removerVagasDuplicadas()">🧹 Remover duplicatas</button>
-    <button class="btn btn-outline btn-sm" onclick="abrirLivroVoluntarios()">👥 Voluntários</button>
-    <button class="btn btn-verde btn-sm" onclick="abrirModalVaga()">+ Nova vaga</button>
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-num" id="vg-st-aberta">—</div><div class="stat-lbl">Em aberto</div></div>
+      <div class="stat"><div class="stat-num" id="vg-st-prench">—</div><div class="stat-lbl">Preenchidas</div></div>
+      <div class="stat"><div class="stat-num" id="vg-st-lm">—</div><div class="stat-lbl">LM / afastamento</div></div>
+      <div class="stat"><div class="stat-num" id="vg-st-total">—</div><div class="stat-lbl">Total</div></div>
+    </div>
+    <div id="lista-vg"></div>
   </div>
-  <div class="stats-bar">
-    <div class="stat"><div class="stat-num" id="vg-st-aberta">—</div><div class="stat-lbl">Em aberto</div></div>
-    <div class="stat"><div class="stat-num" id="vg-st-prench">—</div><div class="stat-lbl">Preenchidas</div></div>
-    <div class="stat"><div class="stat-num" id="vg-st-lm">—</div><div class="stat-lbl">LM / afastamento</div></div>
-    <div class="stat"><div class="stat-num" id="vg-st-total">—</div><div class="stat-lbl">Total</div></div>
+
+  <!-- SUB-ABA: Cirurgias eletivas -->
+  <div id="sub-eletivas" style="display:none">
+    <div class="aviso-box aviso-info" style="margin-bottom:14px">
+      <strong>🔪 Cirurgias eletivas</strong> — divulgação de oportunidades pontuais. <strong>Não entram na escala semanal de reservas.</strong> Servem para a comissão sinalizar, divulgar e registrar quem ocupou a vaga.
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="filtros" style="margin:0;flex:1">
+        <button class="filtro-btn ativo" onclick="setFiltroElet('abertas',this)">Em aberto</button>
+        <button class="filtro-btn" onclick="setFiltroElet('ocupadas',this)">Ocupadas</button>
+        <button class="filtro-btn" onclick="setFiltroElet('todas',this)">Todas</button>
+      </div>
+      <button class="btn btn-verde btn-sm" onclick="abrirModalEletiva()">+ Nova cirurgia eletiva</button>
+    </div>
+    <div id="lista-elet"></div>
   </div>
-  <div id="lista-vg"></div>
 </div>
 
 <!-- ════════════════════════════════════
@@ -523,6 +552,44 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
 </div>
 
 <!-- Modal Nova Vaga -->
+<!-- Modal: Nova Cirurgia Eletiva -->
+<div class="modal-overlay" id="modal-eletiva" onclick="fecharModalFora(event,'modal-eletiva')">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3>🔪 Nova cirurgia eletiva</h3>
+      <button class="btn-fechar" onclick="fecharModal('modal-eletiva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="aviso-box aviso-info" style="margin-bottom:14px;font-size:12px">
+        Esta sinalização <strong>não entra na escala semanal</strong>. Serve apenas para divulgação e registro de quem ocupou.
+      </div>
+      <div class="campo">
+        <label>Hospital / unidade *</label>
+        <input type="text" id="elet-hospital" placeholder="Ex: Hospital Alfa, HUOC…">
+        <div class="msg-erro" id="erro-elet-hospital">Obrigatório.</div>
+      </div>
+      <div class="campo">
+        <label>Especialidade *</label>
+        <input type="text" id="elet-especialidade" placeholder="Ex: Ortopedia, Cirurgia geral, Urologia…">
+        <div class="msg-erro" id="erro-elet-especialidade">Obrigatório.</div>
+      </div>
+      <div class="campo">
+        <label>Cirurgião *</label>
+        <input type="text" id="elet-cirurgiao" placeholder="Nome do cirurgião">
+        <div class="msg-erro" id="erro-elet-cirurgiao">Obrigatório.</div>
+      </div>
+      <div class="campo">
+        <label>Observações <span style="font-weight:400;color:var(--cinza-4)">(opcional)</span></label>
+        <textarea id="elet-obs" rows="2" placeholder="Data prevista, turno, detalhes…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-eletiva')">Cancelar</button>
+      <button class="btn btn-verde" onclick="salvarEletiva()">Registrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-vaga" onclick="fecharModalFora(event,'modal-vaga')">
   <div class="modal-box">
     <div class="modal-hdr">
@@ -766,6 +833,9 @@ let filtroLic  = "todos";
 let filtroAv   = "todos";
 let filtroVg   = "abertas";
 let filtroEsc  = "todos";
+let eletivas   = [];          // {id, hospital, especialidade, cirurgiao, obs, status, ocupadaPor, data}
+let filtroElet = "abertas";
+let subVagasAtiva = "vagas";  // "vagas" | "eletivas"
 
 let _repProtocolo  = null;
 let _retornoId     = null;
@@ -967,16 +1037,18 @@ function setStatus(estado, txt) {
 async function carregarTudo() {
   setStatus("loading","Atualizando…");
   try {
-    const [ra, rl, rv, rap] = await Promise.all([
+    const [ra, rl, rv, rap, rel] = await Promise.all([
       apiGet("listarAcionamentos"),
       apiGet("listarLicencas"),
       apiGet("listarVagas"),
       apiGet("listarAvisosPrevios"),
+      apiGet("listarEletivas"),
     ]);
     if (ra.ok)  acionamentos = (ra.dados||[]).map(normAcionamento).filter(a=>a.protocolo);
     if (rl.ok)  licencas     = (rl.dados||[]).map(normLicenca).filter(l=>l.id);
     if (rv.ok)  vagas        = (rv.dados||[]).map(normVaga).filter(v=>v.id);
     if (rap.ok) avisos       = (rap.dados||[]).map(normAviso).filter(a=>a.protocolo);
+    if (rel && rel.ok) eletivas = (rel.dados||[]).filter(e=>e.id);
     setStatus("ok", "✓ "+horaAtual());
   } catch(e) {
     setStatus("erro","Erro de conexão");
@@ -1007,6 +1079,7 @@ function renderTudo() {
   renderLic();
   renderAv();
   renderVg();
+  if (subVagasAtiva==="eletivas") renderElet();
   renderEscala();
   atualizarBadges();
 }
@@ -1402,13 +1475,46 @@ function renderVg() {
   else if (filtroVg==="reserva") itens=vagas.filter(v=>v.status==="Reserva");
   else itens=vagas.filter(v=>v.status==="Aberta");
 
+  // Ordenação: por hospital/setor + dia da semana, ou por data de criação (ordem original)
+  const ordenar = (document.getElementById("vg-ordenar")||{value:"hospital"}).value;
+  if (ordenar==="hospital") {
+    const ordemDia = {Seg:0,Ter:1,Qua:2,Qui:3,Sex:4,"Sáb":5,Sab:5,Dom:6};
+    const primeiroDia = v => {
+      if (!v.dias||!v.dias.length) return 9;
+      return Math.min(...v.dias.map(d=>ordemDia[d]!==undefined?ordemDia[d]:8));
+    };
+    itens = itens.slice().sort((a,b)=>{
+      const h = (a.hospital||"").localeCompare(b.hospital||"","pt",{sensitivity:"base"});
+      if (h!==0) return h;
+      const s = (a.slot||"").localeCompare(b.slot||"","pt",{sensitivity:"base"});
+      if (s!==0) return s;
+      return primeiroDia(a)-primeiroDia(b);
+    });
+  }
+  // "criacao" mantém a ordem original do array (ordem de inserção)
+
   const DIAS_SEM = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
   const hoje = DIAS_SEM[new Date().getDay()];
 
   const el = document.getElementById("lista-vg");
   if (!itens.length) { el.innerHTML=emptyState("✅",filtroVg==="preenchida"?"Nenhuma preenchida":filtroVg==="reserva"?"Nenhuma cobertura por reserva":"Nenhuma vaga em aberto",""); return; }
 
+  let hospAtual = null;
   el.innerHTML = itens.map(v=>{
+    // Cabeçalho de grupo por hospital (só no modo ordenar por hospital)
+    let cabecalhoGrupo = "";
+    if (ordenar==="hospital" && v.hospital!==hospAtual) {
+      hospAtual = v.hospital;
+      const nVagas = itens.filter(x=>x.hospital===v.hospital).length;
+      cabecalhoGrupo = `<div style="margin:16px 0 8px;padding:7px 14px;background:var(--verde-d);color:#fff;border-radius:8px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+        <span>🏥 ${v.hospital}</span><span style="font-size:11px;opacity:.85;font-weight:600">${nVagas} vaga(s)</span></div>`;
+    }
+    return cabecalhoGrupo + renderCardVaga(v, hoje);
+  }).join("");
+}
+
+function renderCardVaga(v, hoje) {
+  {
     const TIPO_LBL={vago:"Estrutural",lm:"LM / Afastamento",disciplinar:"Disciplinar",gestacional:"Gestacional",vago_quinzenal:"Quinzenal"}[v.tipo]||v.tipo;
     const TIPO_COR={vago:"info",lm:"amarelo",disciplinar:"erro",gestacional:"info",vago_quinzenal:"roxo"}[v.tipo]||"cinza";
 
@@ -1437,6 +1543,118 @@ function renderVg() {
       </div>
       ${v.obs?`<div class="card-body" style="padding:8px 16px;font-size:12px;color:var(--cinza-3);font-style:italic">${v.obs}</div>`:""}
       <div class="card-acoes">${btns}<span style="margin-left:auto;font-size:10px;color:var(--cinza-3);font-family:var(--mono)">${v.id}</span></div>
+    </div>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// SUB-ABA: CIRURGIAS ELETIVAS (não entram na escala semanal)
+// ════════════════════════════════════════════════════════
+
+function mudarSubVagas(qual) {
+  subVagasAtiva = qual;
+  document.getElementById("sub-vagas").style.display    = qual==="vagas"    ? "" : "none";
+  document.getElementById("sub-eletivas").style.display = qual==="eletivas" ? "" : "none";
+  const tv = document.getElementById("subtab-vagas");
+  const te = document.getElementById("subtab-eletivas");
+  const ativo = {borderBottom:"3px solid var(--verde)",color:"var(--verde-d)",fontWeight:"700"};
+  const inativo = {borderBottom:"3px solid transparent",color:"var(--cinza-4)",fontWeight:"600"};
+  Object.assign(tv.style, qual==="vagas"?ativo:inativo);
+  Object.assign(te.style, qual==="eletivas"?ativo:inativo);
+  if (qual==="eletivas") renderElet(); else renderVg();
+}
+
+function setFiltroElet(f, el) {
+  filtroElet = f;
+  document.querySelectorAll("#sub-eletivas .filtro-btn").forEach(b=>b.classList.remove("ativo"));
+  el.classList.add("ativo");
+  renderElet();
+}
+
+function abrirModalEletiva() {
+  ["elet-hospital","elet-especialidade","elet-cirurgiao","elet-obs"].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=""; });
+  ["erro-elet-hospital","erro-elet-especialidade","erro-elet-cirurgiao"].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display="none"; });
+  abrirModal("modal-eletiva");
+}
+
+async function salvarEletiva() {
+  const hospital      = document.getElementById("elet-hospital").value.trim();
+  const especialidade = document.getElementById("elet-especialidade").value.trim();
+  const cirurgiao     = document.getElementById("elet-cirurgiao").value.trim();
+  const obs           = document.getElementById("elet-obs").value.trim();
+  let ok = true;
+  const marca = (id,cond)=>{ const e=document.getElementById(id); if(e) e.style.display=cond?"none":"block"; if(!cond) ok=false; };
+  marca("erro-elet-hospital", !!hospital);
+  marca("erro-elet-especialidade", !!especialidade);
+  marca("erro-elet-cirurgiao", !!cirurgiao);
+  if (!ok) return;
+
+  const nova = {
+    id: "EL"+Date.now().toString().slice(-8),
+    hospital, especialidade, cirurgiao, obs,
+    status: "Aberta", ocupadaPor: "", data: hojeBR()
+  };
+  eletivas.push(nova);
+  fecharModal("modal-eletiva");
+  renderElet();
+  toast("✓ Cirurgia eletiva registrada — "+hospital);
+
+  try { await apiPost({action:"criarEletiva", eletiva:nova}); } catch(e) {}
+}
+
+async function acaoOcuparEletiva(id) {
+  const e = eletivas.find(x=>x.id===id);
+  if (!e) return;
+  const nome = prompt("Nome do cooperado que ocupou esta cirurgia eletiva:\n"+e.hospital+" · "+e.especialidade+" · Dr(a). "+e.cirurgiao);
+  if (!nome || !nome.trim()) return;
+  e.status = "Ocupada";
+  e.ocupadaPor = nome.trim();
+  livroVoluntarios.push({ nome:nome.trim(), vaga:e.hospital+" · "+e.especialidade+" (eletiva)",
+    hospital:e.hospital, turno:"", data:hojeBR(), origem:"Cirurgia eletiva" });
+  renderElet();
+  toast("✓ Eletiva ocupada por "+nome.trim());
+  try { await apiPost({action:"ocuparEletiva", id, ocupadaPor:nome.trim()}); } catch(err) {}
+}
+
+async function acaoDeletarEletiva(id) {
+  const e = eletivas.find(x=>x.id===id);
+  if (!e || !confirm("Remover esta cirurgia eletiva?\n"+e.hospital+" · "+e.especialidade)) return;
+  eletivas = eletivas.filter(x=>x.id!==id);
+  renderElet();
+  toast("✓ Eletiva removida");
+  try { await apiPost({action:"deletarEletiva", id}); } catch(err) {}
+}
+
+function renderElet() {
+  let itens;
+  if (filtroElet==="abertas")  itens = eletivas.filter(e=>e.status==="Aberta");
+  else if (filtroElet==="ocupadas") itens = eletivas.filter(e=>e.status==="Ocupada");
+  else itens = eletivas.slice();
+
+  const el = document.getElementById("lista-elet");
+  if (!el) return;
+  if (!itens.length) {
+    el.innerHTML = emptyState("🔪", filtroElet==="ocupadas"?"Nenhuma eletiva ocupada":filtroElet==="abertas"?"Nenhuma cirurgia eletiva em aberto":"Nenhuma cirurgia eletiva registrada","Use \"+ Nova cirurgia eletiva\" para divulgar uma oportunidade.");
+    return;
+  }
+
+  el.innerHTML = itens.map(e=>{
+    const aberta = e.status==="Aberta";
+    const btns = aberta
+      ? `<button class="btn btn-verde btn-sm" data-id="${e.id}" onclick="acaoOcuparEletiva(this.dataset.id)">✓ Cooperado ocupou</button>
+         <button class="btn btn-erro btn-sm" data-id="${e.id}" onclick="acaoDeletarEletiva(this.dataset.id)">✕ Remover</button>`
+      : `<span style="font-size:12px;color:var(--verde);font-weight:600">✓ ${e.ocupadaPor||"Ocupada"}</span>
+         <button class="btn btn-erro btn-sm" data-id="${e.id}" onclick="acaoDeletarEletiva(this.dataset.id)">✕ Remover</button>`;
+    return `<div class="card" id="el-${e.id}">
+      <div class="card-hdr">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${e.hospital}</div>
+          <div style="font-size:13px;color:var(--texto-2);margin-top:2px">${e.especialidade} · Dr(a). ${e.cirurgiao}</div>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">${mkTag(aberta?"Em aberto":"Ocupada", aberta?"info":"verde")}<span style="font-size:11px;color:var(--cinza-3)">Registrada ${e.data}</span></div>
+        </div>
+      </div>
+      ${e.obs?`<div class="card-body" style="padding:8px 16px;font-size:12px;color:var(--cinza-3);font-style:italic">${e.obs}</div>`:""}
+      <div class="card-acoes">${btns}<span style="margin-left:auto;font-size:10px;color:var(--cinza-3);font-family:var(--mono)">${e.id}</span></div>
     </div>`;
   }).join("");
 }
