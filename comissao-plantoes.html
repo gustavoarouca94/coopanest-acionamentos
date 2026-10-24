@@ -1460,6 +1460,36 @@ function setFiltroVg(f, el) {
   renderVg();
 }
 
+// Chave canônica do hospital: normaliza só a GRAFIA (maiúsculas, acentos,
+// traços, espaços) sem apagar a parte descritiva. Assim "FAV - Iputinga" e
+// "fav iputinga" colapsam na mesma chave, mas "HAM - Hemodinâmica" e
+// "HAM - COB" permanecem distintos.
+function hospitalCanon(h) {
+  return String(h||"")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g,"")   // remove acentos
+    .replace(/[—–\-|·:/]/g," ")                          // separadores → espaço
+    .replace(/[^a-z0-9 ]/g," ")                          // só alfanumérico
+    .replace(/\s+/g," ").trim();
+}
+
+// Para cada chave canônica, escolhe um nome de exibição representativo entre
+// as variantes encontradas (prefere a que tem acrônimo em maiúsculas + traço,
+// depois a mais frequente, depois a mais longa).
+function hospitalDisplayMap(lista) {
+  const grupos = {};
+  lista.forEach(v=>{ const k=hospitalCanon(v.hospital); (grupos[k]=grupos[k]||[]).push(v.hospital||""); });
+  const mapa = {};
+  Object.keys(grupos).forEach(k=>{
+    const nomes = grupos[k];
+    const cont = {};
+    nomes.forEach(n=>{ cont[n]=(cont[n]||0)+1; });
+    const score = n => (/[A-Z]{2,}/.test(n)?1000:0) + (/[—–-]/.test(n)?100:0) + (cont[n]*5) + n.length*0.01;
+    mapa[k] = Object.keys(cont).sort((a,b)=>score(b)-score(a))[0];
+  });
+  return mapa;
+}
+
 function renderVg() {
   const aberta = vagas.filter(v=>v.status==="Aberta").length;
   const prench = vagas.filter(v=>v.status==="Preenchida").length;
@@ -1475,6 +1505,10 @@ function renderVg() {
   else if (filtroVg==="reserva") itens=vagas.filter(v=>v.status==="Reserva");
   else itens=vagas.filter(v=>v.status==="Aberta");
 
+  // Mapa de nome canônico por hospital (unifica variações de grafia do mesmo local)
+  const dispMap = hospitalDisplayMap(vagas);
+  const nomeHosp = v => dispMap[hospitalCanon(v.hospital)] || v.hospital;
+
   // Ordenação: por hospital/setor + dia da semana, ou por data de criação (ordem original)
   const ordenar = (document.getElementById("vg-ordenar")||{value:"hospital"}).value;
   if (ordenar==="hospital") {
@@ -1484,7 +1518,8 @@ function renderVg() {
       return Math.min(...v.dias.map(d=>ordemDia[d]!==undefined?ordemDia[d]:8));
     };
     itens = itens.slice().sort((a,b)=>{
-      const h = (a.hospital||"").localeCompare(b.hospital||"","pt",{sensitivity:"base"});
+      // ordena pela chave canônica (une variações de grafia do mesmo hospital)
+      const h = hospitalCanon(a.hospital).localeCompare(hospitalCanon(b.hospital),"pt",{sensitivity:"base"});
       if (h!==0) return h;
       const s = (a.slot||"").localeCompare(b.slot||"","pt",{sensitivity:"base"});
       if (s!==0) return s;
@@ -1499,21 +1534,23 @@ function renderVg() {
   const el = document.getElementById("lista-vg");
   if (!itens.length) { el.innerHTML=emptyState("✅",filtroVg==="preenchida"?"Nenhuma preenchida":filtroVg==="reserva"?"Nenhuma cobertura por reserva":"Nenhuma vaga em aberto",""); return; }
 
-  let hospAtual = null;
+  let canonAtual = null;
   el.innerHTML = itens.map(v=>{
-    // Cabeçalho de grupo por hospital (só no modo ordenar por hospital)
+    // Cabeçalho de grupo por hospital (só no modo ordenar por hospital),
+    // agrupando pela chave canônica para unir grafias do mesmo local.
     let cabecalhoGrupo = "";
-    if (ordenar==="hospital" && v.hospital!==hospAtual) {
-      hospAtual = v.hospital;
-      const nVagas = itens.filter(x=>x.hospital===v.hospital).length;
+    const canon = hospitalCanon(v.hospital);
+    if (ordenar==="hospital" && canon!==canonAtual) {
+      canonAtual = canon;
+      const nVagas = itens.filter(x=>hospitalCanon(x.hospital)===canon).length;
       cabecalhoGrupo = `<div style="margin:16px 0 8px;padding:7px 14px;background:var(--verde-d);color:#fff;border-radius:8px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center">
-        <span>🏥 ${v.hospital}</span><span style="font-size:11px;opacity:.85;font-weight:600">${nVagas} vaga(s)</span></div>`;
+        <span>🏥 ${nomeHosp(v)}</span><span style="font-size:11px;opacity:.85;font-weight:600">${nVagas} vaga(s)</span></div>`;
     }
-    return cabecalhoGrupo + renderCardVaga(v, hoje);
+    return cabecalhoGrupo + renderCardVaga(v, hoje, nomeHosp(v));
   }).join("");
 }
 
-function renderCardVaga(v, hoje) {
+function renderCardVaga(v, hoje, nomeHospExib) {
   {
     const TIPO_LBL={vago:"Estrutural",lm:"LM / Afastamento",disciplinar:"Disciplinar",gestacional:"Gestacional",vago_quinzenal:"Quinzenal"}[v.tipo]||v.tipo;
     const TIPO_COR={vago:"info",lm:"amarelo",disciplinar:"erro",gestacional:"info",vago_quinzenal:"roxo"}[v.tipo]||"cinza";
@@ -1535,7 +1572,7 @@ function renderCardVaga(v, hoje) {
     return `<div class="card" id="vg-${v.id}">
       <div class="card-hdr">
         <div style="flex:1">
-          <div style="font-weight:700;font-size:14px">${v.hospital}</div>
+          <div style="font-weight:700;font-size:14px">${nomeHospExib||v.hospital}</div>
           <div style="font-size:13px;color:var(--texto-2);margin-top:2px">${v.slot||"—"} · ${v.turno||"—"}</div>
           <div style="font-size:12px;margin-top:5px">${diasHtml}</div>
           <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${mkTag(TIPO_LBL,TIPO_COR)}${v.quinzena?mkTag("Quinzena "+v.quinzena,"cinza"):""}</div>
